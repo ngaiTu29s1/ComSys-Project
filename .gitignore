@@ -1,0 +1,62 @@
+# === Python cache & compiled ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# === Environment / Dependency ===
+.env
+.venv/
+venv/
+ENV/
+env/
+*.env
+*.env.*
+
+# === Conda specific ===
+conda-meta/
+*.conda
+*.lock
+*.log
+
+# === Jupyter & IPython ===
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+jupyter_notebook_config.py
+
+# === Data & Models (generated) ===
+data/
+models/
+*.csv
+*.parquet
+*.joblib
+*.pkl
+*.h5
+
+# === Logs / Outputs ===
+logs/
+*.log
+*.tmp
+*.bak
+
+# === FastAPI / Uvicorn runtime ===
+*.db
+*.sqlite
+__pycache__/
+*.pid
+
+# === Editor / IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === OS / Misc ===
+.DS_Store
+Thumbs.db
+
+# === Build / Packaging ===
+build/
+dist/
+*.egg-info/
