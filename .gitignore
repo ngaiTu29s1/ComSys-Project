@@ -60,3 +60,5 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+
+.github
