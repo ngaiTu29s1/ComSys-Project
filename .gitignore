@@ -27,7 +27,6 @@ jupyter_notebook_config.py
 
 # === Data & Models (generated) ===
 data/
-models/
 *.csv
 *.parquet
 *.joblib
