@@ -1,0 +1,379 @@
+{
+    "info": {
+        "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "name": "IoT Network Selection System",
+        "description": "Comprehensive Postman collection for testing IoT Network Selection API endpoints.\n\n## 🚀 About This Collection\n\nThis collection tests the **IoT Network Selection System** - an energy-efficient network selection system for IoT devices using Multi-Criteria Decision Making (MCDM) algorithm.\n\n### 🎯 Key Features Tested\n- **MCDM Algorithm**: Multi-criteria network selection\n- **Simulation Engine**: IoT device movement simulation\n- **Energy Optimization**: Balance between energy consumption and QoS\n- **Task-based Selection**: Different strategies for IDLE, DATA_BURST, VIDEO_STREAMING\n\n### 📋 Test Workflow\n1. **Health Check** - Verify API is running\n2. **System Status** - Get system overview\n3. **Simulation Step** - Test device movement simulation\n4. **Network Decision** - Test MCDM algorithm with custom data\n5. **Integrated Flow** - Test complete workflow\n6. **Reset & State** - Test simulation management\n\n### 🔧 Setup\n- **Base URL**: `{{baseUrl}}` (set to http://localhost:8000)\n- **Content-Type**: application/json\n- **All endpoints include sample data**\n\nStart with **Health Check** and follow the numbered sequence for best experience.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "12345678"
+    },
+    "item": [
+        {
+            "name": "1. Health & Status",
+            "item": [
+                {
+                    "name": "Health Check",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/health",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "health"
+                            ]
+                        },
+                        "description": "Simple health check to verify the API is running correctly."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Root Info",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                ""
+                            ]
+                        },
+                        "description": "Get basic information about the API and available endpoints."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "System Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "status"
+                            ]
+                        },
+                        "description": "Get comprehensive system status including simulation state and network configurations."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Basic health checks and system information endpoints."
+        },
+        {
+            "name": "2. Simulation Engine",
+            "item": [
+                {
+                    "name": "Run Simulation Step",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": ""
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/simulation/step",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "simulation",
+                                "step"
+                            ]
+                        },
+                        "description": "Execute one simulation step - moves the IoT device to a new position and determines available networks."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Current State",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/simulation/current-state",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "simulation",
+                                "current-state"
+                            ]
+                        },
+                        "description": "Get the current simulation state without advancing to the next step."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Reset Simulation",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": ""
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/simulation/reset?x=100&y=200",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "simulation",
+                                "reset"
+                            ],
+                            "query": [
+                                {
+                                    "key": "x",
+                                    "value": "100",
+                                    "description": "New X coordinate (0-1000)"
+                                },
+                                {
+                                    "key": "y",
+                                    "value": "200",
+                                    "description": "New Y coordinate (0-1000)"
+                                }
+                            ]
+                        },
+                        "description": "Reset simulation to a specific position or default (0,0)."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Endpoints for controlling and monitoring the IoT simulation engine."
+        },
+        {
+            "name": "3. Network Decision Making",
+            "item": [
+                {
+                    "name": "Make Decision - IDLE Task",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"position\": [250, 350],\n  \"current_task\": \"IDLE_MONITORING\",\n  \"available_networks\": [\n    {\n      \"name\": \"Wi-Fi\",\n      \"bandwidth\": 50.0,\n      \"latency\": 15,\n      \"is_available\": true\n    },\n    {\n      \"name\": \"BLE\",\n      \"bandwidth\": 1.0,\n      \"latency\": 50,\n      \"is_available\": true\n    },\n    {\n      \"name\": \"5G\",\n      \"bandwidth\": 120.0,\n      \"latency\": 20,\n      \"is_available\": true\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/decision",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "decision"
+                            ]
+                        },
+                        "description": "Test MCDM algorithm for IDLE_MONITORING task. Should prefer BLE due to energy efficiency."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Make Decision - DATA_BURST Task",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"position\": [400, 600],\n  \"current_task\": \"DATA_BURST_ALERT\",\n  \"available_networks\": [\n    {\n      \"name\": \"Wi-Fi\",\n      \"bandwidth\": 80.0,\n      \"latency\": 12,\n      \"is_available\": true\n    },\n    {\n      \"name\": \"4G\",\n      \"bandwidth\": 25.0,\n      \"latency\": 45,\n      \"is_available\": true\n    },\n    {\n      \"name\": \"BLE\",\n      \"bandwidth\": 1.0,\n      \"latency\": 60,\n      \"is_available\": true\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/decision",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "decision"
+                            ]
+                        },
+                        "description": "Test MCDM algorithm for DATA_BURST_ALERT task. Balanced energy and QoS weights."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Make Decision - VIDEO_STREAMING Task",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"position\": [700, 800],\n  \"current_task\": \"VIDEO_STREAMING\",\n  \"available_networks\": [\n    {\n      \"name\": \"Wi-Fi\",\n      \"bandwidth\": 100.0,\n      \"latency\": 8,\n      \"is_available\": true\n    },\n    {\n      \"name\": \"5G\",\n      \"bandwidth\": 200.0,\n      \"latency\": 15,\n      \"is_available\": true\n    },\n    {\n      \"name\": \"4G\",\n      \"bandwidth\": 15.0,\n      \"latency\": 80,\n      \"is_available\": true\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/decision",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "decision"
+                            ]
+                        },
+                        "description": "Test MCDM algorithm for VIDEO_STREAMING task. QoS prioritized over energy."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Make Decision - Edge Case (No Networks)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"position\": [999, 999],\n  \"current_task\": \"IDLE_MONITORING\",\n  \"available_networks\": []\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/decision",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "decision"
+                            ]
+                        },
+                        "description": "Test error handling when no networks are available. Should return HTTP 400 error."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Make Decision - Edge Case (Poor QoS)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"position\": [50, 50],\n  \"current_task\": \"VIDEO_STREAMING\",\n  \"available_networks\": [\n    {\n      \"name\": \"BLE\",\n      \"bandwidth\": 0.5,\n      \"latency\": 200,\n      \"is_available\": true\n    },\n    {\n      \"name\": \"LoRa\",\n      \"bandwidth\": 0.1,\n      \"latency\": 1000,\n      \"is_available\": true\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/decision",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "decision"
+                            ]
+                        },
+                        "description": "Test algorithm with networks that don't meet QoS requirements for VIDEO streaming."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test the MCDM algorithm with different device states and network configurations."
+        },
+        {
+            "name": "4. Integrated Workflows",
+            "item": [
+                {
+                    "name": "Simulation Step + Decision (Integrated)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": ""
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/simulation/step-with-decision",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "simulation",
+                                "step-with-decision"
+                            ]
+                        },
+                        "description": "Execute complete workflow: simulation step + network decision in one API call."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Combined workflows that integrate multiple system components."
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    "// Set up base URL if not already set",
+                    "if (!pm.variables.get(\"baseUrl\")) {",
+                    "    pm.variables.set(\"baseUrl\", \"http://localhost:8000\");",
+                    "}",
+                    "",
+                    "// Log request info",
+                    "console.log(`🚀 Making request to: ${pm.request.method} ${pm.request.url}`);"
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    "// Global test for all requests",
+                    "pm.test(\"Response time is acceptable\", function () {",
+                    "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+                    "});",
+                    "",
+                    "// Log response info",
+                    "console.log(`✅ Response: ${pm.response.status} ${pm.response.code} (${pm.response.responseTime}ms)`);"
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8000",
+            "type": "string",
+            "description": "Base URL for the IoT Network Selection API"
+        }
+    ]
+}
