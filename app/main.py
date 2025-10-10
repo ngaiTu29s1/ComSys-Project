@@ -8,7 +8,11 @@ File này chứa các endpoint chính để:
 """
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from typing import Dict, List, Optional
+import os
 from app.models.schemas import DeviceState, NetworkState, TaskState
 from app.core.decision_logic import calculate_cost, select_best_network
 from app.services.simulation import SimulationEngine
@@ -20,6 +24,20 @@ app = FastAPI(
     description="API for IoT device network selection using MCDM algorithm and simulation"
 )
 
+# Add CORS middleware for web UI
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static files for web UI
+web_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
+if os.path.exists(web_dir):
+    app.mount("/static", StaticFiles(directory=web_dir), name="static")
+
 # Khởi tạo instance của SimulationEngine
 simulation_engine = SimulationEngine()
 
@@ -29,6 +47,74 @@ print(f"📡 Simulation engine ready with {len(simulation_engine.network_configs
 
 @app.get("/")
 def root():
+    """Root endpoint với thông tin hệ thống"""
+    return {
+        "message": "IoT Network Selection System API",
+        "version": "1.0.0",
+        "endpoints": {
+            "simulation": "/simulation/step - Run simulation step",
+            "decision": "/decision - Make network selection decision", 
+            "status": "/status - Get system status",
+            "web_ui": "/ui - Access web-based map visualization"
+        }
+    }
+
+
+@app.get("/ui")
+def web_ui():
+    """Serve the web UI for map visualization"""
+    web_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web", "index.html")
+    if os.path.exists(web_file):
+        return FileResponse(web_file)
+    else:
+        raise HTTPException(status_code=404, detail="Web UI not found")
+
+
+@app.get("/map")
+def map_data():
+    """Get map data for visualization including base stations and current device state"""
+    stats = simulation_engine.get_simulation_stats()
+    
+    # Get base stations data from simulation engine
+    base_stations = []
+    
+    # Wi-Fi stations
+    for i in range(4):
+        base_stations.append({
+            "id": f"wifi_{i}",
+            "type": "Wi-Fi",
+            "position": simulation_engine.base_stations["Wi-Fi"][i],
+            "color": "#2196F3"
+        })
+    
+    # 5G stations  
+    for i in range(4):
+        base_stations.append({
+            "id": f"5g_{i}",
+            "type": "5G", 
+            "position": simulation_engine.base_stations["5G"][i],
+            "color": "#9C27B0"
+        })
+        
+    # BLE stations
+    for i in range(4):
+        base_stations.append({
+            "id": f"ble_{i}",
+            "type": "BLE",
+            "position": simulation_engine.base_stations["BLE"][i], 
+            "color": "#FF9800"
+        })
+    
+    return {
+        "map_size": stats["map_size"],
+        "base_stations": base_stations,
+        "device_state": {
+            "position": stats["current_position"],
+            "current_task": stats["current_task"],
+            "available_networks": stats["available_networks"]
+        },
+        "simulation_step": stats["simulation_step"]
+    }
     """Root endpoint với thông tin hệ thống"""
     return {
         "message": "IoT Network Selection System API",

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Network Selection Map Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            height: calc(100vh - 40px);
+        }
+
+        .map-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .map-title {
+            color: #333;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .map-canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .control-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .control-section h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .device-info {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .device-info h3 {
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .info-label {
+            font-weight: 500;
+        }
+
+        .info-value {
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .task-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .task-idle { background: #e3f2fd; color: #1976d2; }
+        .task-burst { background: #fff3e0; color: #f57c00; }
+        .task-video { background: #fce4ec; color: #c2185b; }
+
+        .network-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .network-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .network-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .network-stats {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .network-badge {
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .network-wifi { background: #2196F3; }
+        .network-5g { background: #9C27B0; }
+        .network-ble { background: #FF9800; }
+        .network-4g { background: #4CAF50; }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1976D2;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #45a049;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .status-bar {
+            background: #333;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+
+        .animation-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 25px;
+            background: #ccc;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #4CAF50;
+        }
+
+        .toggle-knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 21px;
+            height: 21px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active .toggle-knob {
+            transform: translateX(25px);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .pulsing {
+            animation: pulse 2s infinite;
+        }
+
+        .decision-result {
+            background: linear-gradient(135deg, #FF6B6B, #FF8E53);
+            color: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .decision-result h4 {
+            margin-bottom: 10px;
+            color: white;
+        }
+
+        .cost-comparison {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .cost-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 4px 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        .cost-item.winner {
+            background: rgba(255, 255, 255, 0.3);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Map Visualization -->
+        <div class="map-container">
+            <div class="map-header">
+                <h2 class="map-title">🗺️ IoT Network Selection Map</h2>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: #FF4444;"></div>
+                        <span>IoT Device</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: #2196F3;"></div>
+                        <span>Wi-Fi Station</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: #9C27B0;"></div>
+                        <span>5G Station</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: #FF9800;"></div>
+                        <span>BLE Station</span>
+                    </div>
+                </div>
+            </div>
+            <canvas id="mapCanvas" class="map-canvas" width="800" height="600"></canvas>
+            <div class="status-bar" id="statusBar">
+                Ready - Click "Start Simulation" to begin
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <!-- Device Information -->
+            <div class="device-info">
+                <h3>📱 Device Status</h3>
+                <div class="info-item">
+                    <span class="info-label">Position:</span>
+                    <span class="info-value" id="devicePosition">(0, 0)</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Step:</span>
+                    <span class="info-value" id="simulationStep">0</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Task:</span>
+                    <span class="task-badge task-idle" id="currentTask">IDLE_MONITORING</span>
+                </div>
+            </div>
+
+            <!-- Available Networks -->
+            <div class="control-section">
+                <h3>📡 Available Networks</h3>
+                <div class="network-list" id="networkList">
+                    <div class="network-item">
+                        <span class="network-name">No networks detected</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Decision Result -->
+            <div class="decision-result" id="decisionResult" style="display: none;">
+                <h4>🎯 Network Decision</h4>
+                <div class="info-item">
+                    <span class="info-label">Selected:</span>
+                    <span class="info-value" id="selectedNetwork">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Cost:</span>
+                    <span class="info-value" id="selectedCost">-</span>
+                </div>
+                <div class="cost-comparison" id="costComparison"></div>
+            </div>
+
+            <!-- Controls -->
+            <div class="control-section">
+                <h3>🎮 Controls</h3>
+                <div class="animation-toggle">
+                    <span>Auto-run:</span>
+                    <div class="toggle-switch" id="autoToggle">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-primary" id="stepBtn">▶️ Simulation Step</button>
+                    <button class="btn btn-success" id="decisionBtn">🧠 Make Decision</button>
+                    <button class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
+                </div>
+            </div>
+
+            <!-- System Status -->
+            <div class="control-section">
+                <h3>⚙️ System Status</h3>
+                <div class="info-item">
+                    <span class="info-label">API Status:</span>
+                    <span class="info-value" id="apiStatus">Checking...</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Map Size:</span>
+                    <span class="info-value" id="mapSize">1000x1000</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Base Stations:</span>
+                    <span class="info-value" id="baseStations">12</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="map-visualization.js"></script>
+</body>
+</html>
