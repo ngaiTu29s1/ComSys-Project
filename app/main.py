@@ -16,6 +16,7 @@ import os
 from app.models.schemas import DeviceState, NetworkState, TaskState
 from app.core.decision_logic import calculate_cost, select_best_network
 from app.services.simulation import SimulationEngine
+import logging
 
 # Khởi tạo FastAPI app
 app = FastAPI(
@@ -23,6 +24,10 @@ app = FastAPI(
     version="1.0.0", 
     description="API for IoT device network selection using MCDM algorithm and simulation"
 )
+
+# Configure logging for debugging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("IoT Network Selection")
 
 # Add CORS middleware for web UI
 app.add_middleware(
@@ -34,15 +39,16 @@ app.add_middleware(
 )
 
 # Mount static files for web UI
-web_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web")
-if os.path.exists(web_dir):
-    app.mount("/static", StaticFiles(directory=web_dir), name="static")
+app.mount("/static", StaticFiles(directory="web"), name="static")
 
 # Khởi tạo instance của SimulationEngine
 simulation_engine = SimulationEngine()
 
 print("🚀 IoT Network Selection API initialized")
 print(f"📡 Simulation engine ready with {len(simulation_engine.network_configs)} network types")
+
+logger.debug("Static files mounted at /static")
+logger.debug("Web UI endpoint available at /ui")
 
 
 @app.get("/")

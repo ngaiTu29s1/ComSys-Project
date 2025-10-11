@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -122,9 +123,20 @@
             text-transform: uppercase;
         }
 
-        .task-idle { background: #e3f2fd; color: #1976d2; }
-        .task-burst { background: #fff3e0; color: #f57c00; }
-        .task-video { background: #fce4ec; color: #c2185b; }
+        .task-idle {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .task-burst {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .task-video {
+            background: #fce4ec;
+            color: #c2185b;
+        }
 
         .network-list {
             max-height: 200px;
@@ -160,10 +172,21 @@
             color: white;
         }
 
-        .network-wifi { background: #2196F3; }
-        .network-5g { background: #9C27B0; }
-        .network-ble { background: #FF9800; }
-        .network-4g { background: #4CAF50; }
+        .network-wifi {
+            background: #2196F3;
+        }
+
+        .network-5g {
+            background: #9C27B0;
+        }
+
+        .network-ble {
+            background: #FF9800;
+        }
+
+        .network-4g {
+            background: #4CAF50;
+        }
 
         .controls {
             display: flex;
@@ -276,9 +299,20 @@
         }
 
         @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         .pulsing {
@@ -320,6 +354,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <!-- Map Visualization -->
@@ -410,6 +445,16 @@
                 </div>
             </div>
 
+            <!-- Task Selection -->
+            <div class="control-section">
+                <h3>📋 Select Task</h3>
+                <select id="taskSelector" class="btn btn-secondary">
+                    <option value="IDLE_MONITORING">Idle Monitoring</option>
+                    <option value="DATA_BURST_ALERT">Data Burst Alert</option>
+                    <option value="VIDEO_STREAMING">Video Streaming</option>
+                </select>
+            </div>
+
             <!-- System Status -->
             <div class="control-section">
                 <h3>⚙️ System Status</h3>
@@ -429,6 +474,7 @@
         </div>
     </div>
 
-    <script src="map-visualization.js"></script>
+    <script src="/static/map-visualization.js"></script>
 </body>
+
 </html>
