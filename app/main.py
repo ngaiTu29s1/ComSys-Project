@@ -121,16 +121,6 @@ def map_data():
         },
         "simulation_step": stats["simulation_step"]
     }
-    """Root endpoint với thông tin hệ thống"""
-    return {
-        "message": "IoT Network Selection System API",
-        "version": "1.0.0",
-        "endpoints": {
-            "simulation": "/simulation/step - Run simulation step",
-            "decision": "/decision - Make network selection decision", 
-            "status": "/status - Get system status"
-        }
-    }
 
 
 @app.get("/status")
