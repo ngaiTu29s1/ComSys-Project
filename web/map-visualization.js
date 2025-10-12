@@ -298,8 +298,8 @@ class MapVisualization {
 
     handleCanvasClick(event) {
         const rect = this.canvas.getBoundingClientRect();
-        const x = Math.round((event.clientX - rect.left) / this.scale.x);
-        const y = Math.round((event.clientY - rect.top) / this.scale.y);
+        const x = Math.round((event.clientX - rect.left));
+        const y = Math.round((event.clientY - rect.top));
 
         // Update device position
         this.devicePosition = { x, y };
