@@ -1,3 +1,18 @@
+# Ignore Conda temporary folders accidentally created inside the repo
+Tran/AppData/Local/Temp/
+**/conda-*/
+
+# Python/venv caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# VS Code
+.vscode/
+
+# Node/Frontend
+node_modules/
+dist/
 # === Python cache & compiled ===
 __pycache__/
 *.py[cod]
@@ -61,3 +76,5 @@ dist/
 *.egg-info/
 
 .github
+
+scripts/
