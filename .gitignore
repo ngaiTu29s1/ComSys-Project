@@ -1,4 +1,6 @@
 # Ignore Conda temporary folders accidentally created inside the repo
+Tran/
+Tu/
 Tran/AppData/Local/Temp/
 **/conda-*/
 
