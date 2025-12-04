@@ -88,6 +88,15 @@ class MapVisualization {
             this.toggleAutoRun();
         });
 
+        // AI/ML toggle
+        const useAIToggle = document.getElementById('useAIToggle');
+        useAIToggle.addEventListener('click', () => {
+            useAIToggle.classList.toggle('active');
+            const isAI = useAIToggle.classList.contains('active');
+            console.log('AI mode:', isAI ? 'ENABLED' : 'DISABLED');
+            this.updateStatusBar(isAI ? '🤖 AI/ML Mode enabled' : '📐 MCDM Mode enabled');
+        });
+
         // Canvas click for manual device placement
         this.canvas.addEventListener('click', (e) => {
             console.log('Canvas clicked at', e.clientX, e.clientY);
@@ -219,7 +228,12 @@ class MapVisualization {
         }
 
         try {
-            this.updateStatusBar('🧠 Making network decision...');
+            // Check AI/ML toggle state
+            const useAIToggle = document.getElementById('useAIToggle');
+            const useAI = useAIToggle.classList.contains('active');
+            const endpoint = useAI ? '/decision/ml' : '/decision';
+
+            this.updateStatusBar(useAI ? '🤖 Making AI/ML decision...' : '📐 Making MCDM decision...');
 
             const payload = {
                 position: [this.devicePosition.x, this.devicePosition.y],
@@ -227,7 +241,7 @@ class MapVisualization {
                 available_networks: this.availableNetworks
             };
 
-            const response = await fetch(`${this.apiBaseUrl}/decision`, {
+            const response = await fetch(`${this.apiBaseUrl}${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -241,17 +255,36 @@ class MapVisualization {
 
             const data = await response.json();
 
-            this.decisionResult = {
-                selectedNetwork: data.optimal_network,
-                cost: data.optimal_cost,
-                allCosts: data.all_network_costs,
-                algorithm: data.algorithm
-            };
+            // Handle different response formats (ML vs MCDM)
+            if (useAI) {
+                // ML response format
+                this.decisionResult = {
+                    selectedNetwork: data.selected_network,
+                    stationId: data.station_id,
+                    method: data.method,
+                    confidence: data.confidence,
+                    cost: null,
+                    allCosts: null,
+                    algorithm: 'Machine Learning'
+                };
+                this.connectedStation = data.station_id;
+                this.updateStatusBar(`✅ [AI] Selected: ${data.selected_network} (Conf: ${(data.confidence * 100).toFixed(1)}%)`);
+            } else {
+                // MCDM response format
+                this.decisionResult = {
+                    selectedNetwork: data.optimal_network,
+                    stationId: null,
+                    method: 'MCDM',
+                    confidence: null,
+                    cost: data.optimal_cost,
+                    allCosts: data.all_network_costs,
+                    algorithm: data.decision_summary?.algorithm || 'MCDM'
+                };
+                this.updateStatusBar(`✅ [MCDM] Selected: ${data.optimal_network} (Cost: ${data.optimal_cost.toFixed(2)})`);
+            }
 
             this.updateDecisionDisplay();
             this.draw();
-
-            this.updateStatusBar(`Decision: Selected ${data.optimal_network} (cost: ${data.optimal_cost})`);
 
         } catch (error) {
             console.error('Decision making failed:', error);
@@ -481,10 +514,26 @@ class MapVisualization {
 
         decisionElement.style.display = 'block';
 
+        // Update selected network
         document.getElementById('selectedNetwork').textContent = this.decisionResult.selectedNetwork;
-        document.getElementById('selectedCost').textContent = this.decisionResult.cost.toFixed(2);
 
-        // Update cost comparison if available
+        // Update cost/confidence display based on method
+        const costElement = document.getElementById('selectedCost');
+        if (this.decisionResult.method === 'ML' || this.decisionResult.method === 'MCDM_Fallback') {
+            // AI/ML mode - show confidence
+            costElement.textContent = this.decisionResult.confidence !== null
+                ? `${(this.decisionResult.confidence * 100).toFixed(1)}%`
+                : 'N/A';
+            costElement.parentElement.querySelector('strong').textContent = 'Confidence:';
+        } else {
+            // MCDM mode - show cost
+            costElement.textContent = this.decisionResult.cost !== null
+                ? this.decisionResult.cost.toFixed(2)
+                : 'N/A';
+            costElement.parentElement.querySelector('strong').textContent = 'Cost:';
+        }
+
+        // Update cost comparison if available (MCDM only)
         const costComparison = document.getElementById('costComparison');
         if (this.decisionResult.allCosts) {
             const sortedCosts = Object.entries(this.decisionResult.allCosts)
@@ -499,6 +548,9 @@ class MapVisualization {
                     </div>
                 `;
             }).join('');
+        } else {
+            // Clear cost comparison for ML mode
+            costComparison.innerHTML = `<div style="text-align: center; color: #999; padding: 10px;">Method: ${this.decisionResult.method || 'ML'}</div>`;
         }
     }
 
