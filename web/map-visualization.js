@@ -323,8 +323,8 @@ class MapVisualization {
                     stationId: data.station_id,
                     method: data.method,
                     confidence: data.confidence,
-                    cost: null,
-                    allCosts: null,
+                    cost: data.cost || null,
+                    allCosts: data.all_network_costs || null,
                     algorithm: 'Machine Learning'
                 };
                 this.connectedStation = data.station_id;
@@ -613,6 +613,12 @@ class MapVisualization {
             document.getElementById('confidenceValue').textContent = `${confidence.toFixed(1)}%`;
             document.getElementById('confidenceBar').style.width = `${confidence}%`;
 
+            // Update confidence metric label dynamically
+            const confidenceLabel = document.querySelector('#confidenceMetric .metric-label span:first-child');
+            if (confidenceLabel) {
+                confidenceLabel.textContent = 'AI Confidence';
+            }
+
             if (isFallback) {
                 console.warn('⚠️ ML prediction used MCDM fallback');
             }
@@ -627,6 +633,12 @@ class MapVisualization {
             document.getElementById('costValue').textContent = cost.toFixed(2);
             const costPercent = Math.min(100, (cost / 50) * 100);
             document.getElementById('costBar').style.width = `${costPercent}%`;
+
+            // Update cost metric label
+            const costLabel = document.querySelector('#costMetric .metric-label span:first-child');
+            if (costLabel) {
+                costLabel.textContent = 'Optimization Cost';
+            }
         }
 
         // Populate comprehensive network table

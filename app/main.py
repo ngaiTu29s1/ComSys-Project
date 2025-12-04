@@ -178,9 +178,13 @@ def simulation_step() -> Dict:
                 "available_networks": [
                     {
                         "name": network.name,
+                        "station_id": getattr(network, 'station_id', network.name),
                         "bandwidth": network.bandwidth,
                         "latency": network.latency,
-                        "is_available": network.is_available
+                        "is_available": network.is_available,
+                        "rssi": getattr(network, 'rssi', None),
+                        "snr": getattr(network, 'snr', None),
+                        "packet_loss_rate": getattr(network, 'packet_loss_rate', None)
                     }
                     for network in new_device_state.available_networks
                 ]
