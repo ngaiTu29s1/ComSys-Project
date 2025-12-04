@@ -62,7 +62,7 @@ class DeviceState(BaseModel):
     current_task: TaskState = Field(..., description="Current task state")
     available_networks: List[NetworkState] = Field(
         ..., 
-        min_items=0, 
+        min_length=0, 
         description="List of available networks at current position"
     )
 
