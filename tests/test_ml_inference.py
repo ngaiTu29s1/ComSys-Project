@@ -64,8 +64,8 @@ def test_feature_extraction():
 )
 def test_ml_predictor_initialization():
     """Test khởi tạo MLPredictor"""
-    predictor = MLPredictor("models/rf_network_selector.pkl")
-    assert predictor.model is not None
+    predictor = MLPredictor.get_instance()
+    assert predictor.is_available
 
 
 @pytest.mark.skipif(
@@ -75,7 +75,7 @@ def test_ml_predictor_initialization():
 def test_ml_prediction():
     """Test ML prediction logic"""
     engine = SimulationEngine()
-    predictor = MLPredictor("models/rf_network_selector.pkl")
+    predictor = MLPredictor.get_instance()
     
     # Run simulation
     device_state = engine.run_simulation_step()
