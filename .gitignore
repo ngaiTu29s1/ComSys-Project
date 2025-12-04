@@ -1,3 +1,20 @@
+# Ignore Conda temporary folders accidentally created inside the repo
+Tran/
+Tu/
+Tran/AppData/Local/Temp/
+**/conda-*/
+
+# Python/venv caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# VS Code
+.vscode/
+
+# Node/Frontend
+node_modules/
+dist/
 # === Python cache & compiled ===
 __pycache__/
 *.py[cod]
@@ -26,11 +43,15 @@ conda-meta/
 jupyter_notebook_config.py
 
 # === Data & Models (generated) ===
-data/
-*.csv
+data/raw/*.csv
+data/processed/*.csv
+models/*.pkl
+models/*.joblib
 *.parquet
-*.joblib
-*.pkl
+
+# Keep directory structure
+!data/.gitkeep
+!models/.gitkeep
 *.h5
 
 # === Logs / Outputs ===
@@ -61,3 +82,5 @@ dist/
 *.egg-info/
 
 .github
+
+scripts/
