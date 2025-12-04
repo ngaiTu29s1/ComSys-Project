@@ -1,25 +1,15 @@
-"""
-Engine mô phỏng cho hệ thống IoT Network Selection.
-
-Module này cung cấp lõi mô phỏng để:
-- Tạo môi trường mạng động với các base stations
-- Di chuyển thiết bị IoT trong không gian 2D
-- Tính toán QoS dựa trên khoảng cách thực tế
-- Generate scenarios cho việc thu thập dữ liệu và testing
-"""
-
 import random
 import math
 from typing import Dict, List, Tuple
 from app.models.schemas import TaskState, NetworkState, NetworkConfig, DeviceState
+from app.services.network_physics import NetworkPhysics
 
 
 class SimulationEngine:
-    """
-    Engine mô phỏng chính cho hệ thống IoT Network Selection.
+    """Main simulation engine for IoT Network Selection system.
     
-    Mô phỏng một thiết bị IoT di chuyển trong môi trường có nhiều base stations,
-    với QoS thay đổi theo khoảng cách và các tác vụ ngẫu nhiên.
+    Simulates an IoT device moving in an environment with multiple base stations,
+    with QoS changing based on distance using physics-based wireless propagation models.
     """
     
     def __init__(self, map_size: Tuple[int, int] = (1000, 1000)):
@@ -105,111 +95,78 @@ class SimulationEngine:
         """Tính khoảng cách Euclidean giữa 2 điểm"""
         return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
     
-    def _calculate_qos_by_distance(
-        self, 
-        device_position: Tuple[int, int], 
-        base_station_position: Tuple[int, int],
-        network_type: str
-    ) -> Dict[str, float]:
-        """
-        Tính toán QoS (bandwidth, latency) dựa trên khoảng cách.
-        
-        Args:
-            device_position: Vị trí thiết bị (x, y)
-            base_station_position: Vị trí base station (x, y)  
-            network_type: Loại mạng ("Wi-Fi", "5G", "BLE")
-            
-        Returns:
-            Dict chứa bandwidth (Mbps) và latency (ms)
-        """
-        distance = self._calculate_distance(device_position, base_station_position)
-        
-        # Thông số tối đa cho từng loại mạng (khi khoảng cách = 0)
-        max_specs = {
-            "Wi-Fi": {"bandwidth": 100.0, "latency": 5, "max_range": 100},
-            "5G": {"bandwidth": 200.0, "latency": 10, "max_range": 500}, 
-            "BLE": {"bandwidth": 2.0, "latency": 20, "max_range": 50}
-        }
-        
-        if network_type not in max_specs:
-            return {"bandwidth": 0.0, "latency": 9999}
-        
-        spec = max_specs[network_type]
-        max_range = spec["max_range"]
-        
-        # Nếu quá xa khỏi phạm vi, mạng không khả dụng
-        if distance > max_range:
-            return {"bandwidth": 0.0, "latency": 9999}
-        
-        # Công thức tuyến tính: giá trị giảm theo khoảng cách
-        # Bandwidth giảm tuyến tính từ max về 10% khi ở biên
-        distance_ratio = distance / max_range  # 0.0 -> 1.0
-        
-        # Bandwidth: từ 100% xuống 10% theo khoảng cách
-        bandwidth = spec["bandwidth"] * (1.0 - 0.9 * distance_ratio)
-        
-        # Latency: từ min tăng lên 10x khi ở biên  
-        latency = spec["latency"] * (1.0 + 9.0 * distance_ratio)
-        
-        # Thêm một chút noise để mô phỏng thực tế
-        bandwidth *= (0.8 + 0.4 * random.random())  # ±20% noise
-        latency *= (0.8 + 0.4 * random.random())    # ±20% noise
-        
-        return {
-            "bandwidth": max(0.1, bandwidth),  # Tối thiểu 0.1 Mbps
-            "latency": max(5, int(latency))    # Tối thiểu 5ms
-        }
-    
+
     def _find_best_base_station(
         self, 
         device_position: Tuple[int, int], 
         network_type: str
     ) -> Tuple[Tuple[int, int], Dict[str, float]]:
-        """
-        Tìm base station tốt nhất (gần nhất) cho một loại mạng.
+        """Find the best base station for a network type using physics-based model.
+        
+        Selects station with best SNR (not necessarily closest due to shadowing).
         
         Returns:
-            Tuple (vị trí base station tốt nhất, QoS tương ứng)
+            Tuple (best base station position, QoS metrics)
         """
         if network_type not in self.base_stations:
-            return None, {"bandwidth": 0.0, "latency": 9999}
+            return None, {
+                "bandwidth": 0.0,
+                "latency": 9999,
+                "packet_loss": 1.0,
+                "rssi": -999,
+                "snr": -999,
+                "is_available": False
+            }
         
         stations = self.base_stations[network_type]
         best_station = None
         best_qos = None
-        min_distance = float('inf')
+        best_snr = -999
         
+        # Find station with best SNR (not necessarily closest)
         for station_pos in stations:
             distance = self._calculate_distance(device_position, station_pos)
-            if distance < min_distance:
-                min_distance = distance
+            
+            # Calculate QoS using physics-based model
+            qos = NetworkPhysics.calculate_qos(network_type, distance)
+            
+            # Select station with best SNR
+            if qos["is_available"] and qos["snr"] > best_snr:
+                best_snr = qos["snr"]
                 best_station = station_pos
-                best_qos = self._calculate_qos_by_distance(
-                    device_position, station_pos, network_type
-                )
+                best_qos = qos
         
-        return best_station, best_qos or {"bandwidth": 0.0, "latency": 9999}
+        # If no station is available
+        if best_qos is None:
+            return None, {
+                "bandwidth": 0.0,
+                "latency": 9999,
+                "packet_loss": 1.0,
+                "rssi": -999,
+                "snr": -999,
+                "is_available": False
+            }
+        
+        return best_station, best_qos
     
     def _update_available_networks(self):
-        """Cập nhật danh sách networks khả dụng cho vị trí hiện tại"""
+        """Update list of available networks for current position using physics model"""
         available_networks = []
         current_pos = self.device_state.position
         
         for network_type in self.network_configs.keys():
-            # Tìm base station tốt nhất cho loại mạng này
             best_station, qos = self._find_best_base_station(current_pos, network_type)
             
-            # Chỉ thêm vào nếu có signal (bandwidth > 0)
-            if qos["bandwidth"] > 0:
+            # Only add if network is available (SNR > 0)
+            if qos["is_available"]:
                 network_state = NetworkState(
                     name=network_type,
-                    bandwidth=round(qos["bandwidth"], 1),
+                    bandwidth=qos["bandwidth"],
                     latency=qos["latency"],
                     is_available=True
                 )
                 available_networks.append(network_state)
         
-        # Cập nhật device state
         self.device_state.available_networks = available_networks
     
     def _generate_random_task(self) -> TaskState:
@@ -264,25 +221,20 @@ class SimulationEngine:
         return (new_x, new_y)
     
     def run_simulation_step(self) -> DeviceState:
-        """
-        Chạy một bước mô phỏng.
+        """Run one simulation step.
         
         Returns:
-            DeviceState mới nhất sau bước mô phỏng này
+            Latest DeviceState after this simulation step
         """
         self.simulation_step += 1
         
-        # 1. Di chuyển thiết bị đến vị trí mới
         new_position = self._move_device()
-        
-        # 2. Chọn task ngẫu nhiên
         new_task = self._generate_random_task()
         
-        # 3. Cập nhật device state
         self.device_state.position = new_position
         self.device_state.current_task = new_task
         
-        # 4. Tính toán lại networks khả dụng cho vị trí mới
+        # Recalculate available networks using physics-based model
         self._update_available_networks()
         
         return self.device_state

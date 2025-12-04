@@ -1,36 +1,19 @@
-"""
-Pydantic models cho hệ thống mô phỏng lựa chọn mạng tiết kiệm năng lượng.
-
-Các models này định nghĩa cấu trúc dữ liệu cho:
-- Trạng thái tác vụ của thiết bị IoT
-- Cấu hình và trạng thái mạng
-- Thông tin thiết bị trong hệ thống mô phỏng
-"""
-
 from enum import Enum
 from typing import List, Tuple
 from pydantic import BaseModel, Field
 
 
 class TaskState(str, Enum):
-    """
-    Enum định nghĩa các trạng thái tác vụ của thiết bị IoT.
-    Mỗi trạng thái có đặc điểm năng lượng và QoS khác nhau.
-    """
-    IDLE_MONITORING = "IDLE_MONITORING"        # Giám sát nhàn rỗi
-    DATA_BURST_ALERT = "DATA_BURST_ALERT"      # Cảnh báo với burst data
-    VIDEO_STREAMING = "VIDEO_STREAMING"        # Streaming video
+    IDLE_MONITORING = "IDLE_MONITORING"
+    DATA_BURST_ALERT = "DATA_BURST_ALERT"      
+    VIDEO_STREAMING = "VIDEO_STREAMING"        
 
 
 class NetworkConfig(BaseModel):
-    """
-    Cấu hình tĩnh của một mạng trong hệ thống.
-    Chứa các thông số năng lượng cơ bản để tính toán cost function.
-    """
-    name: str = Field(..., description="Tên mạng (ví dụ: 'Wi-Fi', '5G', 'BLE')")
-    energy_tx: float = Field(..., gt=0, description="Năng lượng truyền (mJ/KB)")
-    energy_idle: float = Field(..., gt=0, description="Năng lượng chờ (mW)")
-    energy_wakeup: float = Field(..., ge=0, description="Năng lượng khởi động (mJ)")
+    name: str = Field(..., description="Network name (e.g., 'Wi-Fi', '5G', 'BLE')")
+    energy_tx: float = Field(..., gt=0, description="Transmission energy (mJ/KB)")
+    energy_idle: float = Field(..., gt=0, description="Idle energy (mW)")
+    energy_wakeup: float = Field(..., ge=0, description="Wakeup energy (mJ)")
 
     model_config = {
         "json_schema_extra": {
@@ -47,14 +30,10 @@ class NetworkConfig(BaseModel):
 
 
 class NetworkState(BaseModel):
-    """
-    Trạng thái động của một mạng tại thời điểm hiện tại.
-    Bao gồm các thông số QoS và khả năng kết nối.
-    """
-    name: str = Field(..., description="Tên mạng")
-    bandwidth: float = Field(..., gt=0, description="Băng thông khả dụng (Mbps)")
-    latency: int = Field(..., gt=0, description="Độ trễ (ms)")
-    is_available: bool = Field(..., description="Trạng thái khả dụng của mạng")
+    name: str = Field(..., description="Network name")
+    bandwidth: float = Field(..., gt=0, description="Available bandwidth (Mbps)")
+    latency: int = Field(..., gt=0, description="Latency (ms)")
+    is_available: bool = Field(..., description="Network availability status")
 
     model_config = {
         "json_schema_extra": {
@@ -72,15 +51,15 @@ class NetworkState(BaseModel):
 
 class DeviceState(BaseModel):
     """
-    Trạng thái hiện tại của thiết bị IoT trong hệ thống mô phỏng.
-    Bao gồm vị trí, tác vụ hiện tại và danh sách mạng khả dụng.
+    Current state of the IoT device in the simulation system.
+    Includes position, current task, and list of available networks.
     """
-    position: Tuple[int, int] = Field(..., description="Tọa độ thiết bị (x, y)")
-    current_task: TaskState = Field(..., description="Trạng thái tác vụ hiện tại")
+    position: Tuple[int, int] = Field(..., description="Device coordinates (x, y)")
+    current_task: TaskState = Field(..., description="Current task state")
     available_networks: List[NetworkState] = Field(
         ..., 
         min_items=0, 
-        description="Danh sách các mạng khả dụng tại vị trí hiện tại"
+        description="List of available networks at current position"
     )
 
     model_config = {
