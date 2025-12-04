@@ -13,9 +13,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from typing import Dict, List, Optional
 import os
-from app.models.schemas import DeviceState, NetworkState, TaskState
+from app.models.schemas import DeviceState, NetworkState
 from app.core.decision_logic import calculate_cost, select_best_network
 from app.services.simulation import SimulationEngine
+from app.ml.predictor import MLPredictor
 import logging
 
 # Khởi tạo FastAPI app
@@ -43,6 +44,10 @@ app.mount("/static", StaticFiles(directory="web"), name="static")
 
 # Khởi tạo instance của SimulationEngine
 simulation_engine = SimulationEngine()
+
+# Initialize ML Predictor (Singleton)
+ml_predictor = MLPredictor.get_instance()
+logger.info(f"🤖 ML Predictor initialized - Model available: {ml_predictor.is_available}")
 
 print("🚀 IoT Network Selection API initialized")
 print(f"📡 Simulation engine ready with {len(simulation_engine.network_configs)} network types")
@@ -277,7 +282,7 @@ def make_decision(device_state: DeviceState) -> Dict:
                 "current_task": device_state.current_task.value
             },
             "all_network_costs": {
-                name: round(cost, 2) 
+                "name": round(cost, 2) 
                 for name, cost in network_costs.items()
             },
             "cost_analysis": cost_details,
@@ -299,6 +304,138 @@ def make_decision(device_state: DeviceState) -> Dict:
         raise HTTPException(
             status_code=500,
             detail=f"Decision making failed: {str(e)}"
+        )
+
+
+@app.post("/decision/ml")
+def make_decision_ml(device_state: DeviceState) -> Dict:
+    """
+    Endpoint để thực hiện quyết định lựa chọn mạng bằng ML.
+    
+    Sử dụng Random Forest model để dự đoán mạng tối ưu.
+    Fallback về MCDM nếu ML không khả dụng hoặc thất bại.
+    
+    Args:
+        device_state: Trạng thái thiết bị với danh sách mạng khả dụng
+        
+    Returns:
+        Dict chứa mạng được chọn, station_id, method, confidence
+    """
+    try:
+        # Kiểm tra có mạng khả dụng không
+        if not device_state.available_networks:
+            raise HTTPException(
+                status_code=400,
+                detail="No available networks in device state"
+            )
+        
+        selected_network = None
+        station_id = None
+        method = "ML"
+        confidence = 0.0
+        
+        # Thử dự đoán bằng ML
+        if ml_predictor.is_available:
+            try:
+                predicted_network, ml_confidence = ml_predictor.predict(
+                    device_state=device_state,
+                    available_networks=device_state.available_networks,
+                    simulation_engine=simulation_engine
+                )
+                
+                if predicted_network is not None:
+                    selected_network = predicted_network
+                    confidence = ml_confidence
+                    logger.info(f"✅ ML prediction successful: {predicted_network.name} (confidence: {confidence:.2%})")
+                else:
+                    logger.warning("⚠️ ML prediction returned None, falling back to MCDM")
+                    method = "MCDM_Fallback"
+                    
+            except Exception as e:
+                logger.error(f"❌ ML prediction failed: {str(e)}, falling back to MCDM")
+                method = "MCDM_Fallback"
+        else:
+            logger.warning("⚠️ ML model not available, using MCDM")
+            method = "MCDM_Fallback"
+        
+        # Fallback to MCDM if ML failed
+        if selected_network is None:
+            selected_network = select_best_network(
+                device_state=device_state,
+                simulation_engine=simulation_engine
+            )
+            confidence = 1.0  # MCDM is deterministic
+            logger.info(f"✅ MCDM fallback successful: {selected_network.name}")
+        
+        # Find station_id with highest SNR for selected network type
+        target_network_type = selected_network.name
+        best_station = None
+        best_snr = float('-inf')
+        
+        # Lặp qua tất cả available_networks để tìm station có SNR cao nhất
+        for network in device_state.available_networks:
+            if network.name == target_network_type:
+                # Ưu tiên SNR, fallback về RSSI nếu SNR không có
+                snr = network.snr if hasattr(network, 'snr') and network.snr is not None else (
+                    network.rssi if hasattr(network, 'rssi') and network.rssi is not None else float('-inf')
+                )
+                
+                if snr > best_snr:
+                    best_snr = snr
+                    best_station = network
+        
+        # Extract station_id từ best station
+        if best_station is not None and hasattr(best_station, 'station_id') and best_station.station_id is not None:
+            station_id = best_station.station_id
+            logger.debug(f"🎯 Found best station: {station_id} with SNR: {best_snr:.2f}")
+        else:
+            # Fallback: tính toán station gần nhất theo khoảng cách
+            network_type = target_network_type
+            base_stations = simulation_engine.base_stations.get(network_type, [])
+            if base_stations:
+                min_distance = float('inf')
+                closest_idx = 0
+                device_pos = device_state.position
+                
+                for idx, bs_pos in enumerate(base_stations):
+                    distance = ((device_pos[0] - bs_pos[0])**2 + (device_pos[1] - bs_pos[1])**2)**0.5
+                    if distance < min_distance:
+                        min_distance = distance
+                        closest_idx = idx
+                
+                station_id = f"{network_type}-{closest_idx + 1}"
+                logger.debug(f"🎯 Fallback to closest station: {station_id} (distance: {min_distance:.2f}m)")
+            else:
+                station_id = f"{network_type}-1"
+                logger.warning(f"⚠️  No base stations found, using default: {station_id}")
+        
+        # Prepare response
+        response_data = {
+            "selected_network": target_network_type,
+            "station_id": station_id,
+            "method": method,
+            "confidence": round(confidence, 4),
+            "device_info": {
+                "position": device_state.position,
+                "current_task": device_state.current_task.value
+            },
+            "network_details": {
+                "name": selected_network.name,
+                "bandwidth": selected_network.bandwidth,
+                "latency": selected_network.latency,
+                "snr": getattr(selected_network, 'snr', None),
+                "rssi": getattr(selected_network, 'rssi', None)
+            }
+        }
+        
+        return response_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"ML decision making failed: {str(e)}"
         )
 
 
