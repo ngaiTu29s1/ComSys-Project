@@ -66,24 +66,25 @@ class SimulationEngine:
     
     def _init_base_stations(self):
         """Đặt các base stations tại các vị trí cố định trên bản đồ"""
+        # Store stations with IDs
         self.base_stations = {
             "Wi-Fi": [
-                (100, 100),   # Wi-Fi router 1 - khu dân cư
-                (300, 250),   # Wi-Fi router 2 - văn phòng  
-                (600, 400),   # Wi-Fi router 3 - quán café
-                (800, 750),   # Wi-Fi router 4 - trung tâm thương mại
+                {"id": "WiFi-1", "pos": (100, 100)},   # Wi-Fi router 1 - khu dân cư
+                {"id": "WiFi-2", "pos": (300, 250)},   # Wi-Fi router 2 - văn phòng  
+                {"id": "WiFi-3", "pos": (600, 400)},   # Wi-Fi router 3 - quán café
+                {"id": "WiFi-4", "pos": (800, 750)},   # Wi-Fi router 4 - trung tâm thương mại
             ],
             "5G": [
-                (200, 200),   # 5G tower 1 - trung tâm thành phố
-                (500, 300),   # 5G tower 2 - khu công nghiệp
-                (700, 600),   # 5G tower 3 - sân bay
-                (900, 100),   # 5G tower 4 - khu vực ngoại ô
+                {"id": "5G-1", "pos": (200, 200)},   # 5G tower 1 - trung tâm thành phố
+                {"id": "5G-2", "pos": (500, 300)},   # 5G tower 2 - khu công nghiệp
+                {"id": "5G-3", "pos": (700, 600)},   # 5G tower 3 - sân bay
+                {"id": "5G-4", "pos": (900, 100)},   # 5G tower 4 - khu vực ngoại ô
             ],
             "BLE": [
-                (150, 150),   # BLE beacon 1 - cửa hàng
-                (350, 350),   # BLE beacon 2 - bảo tàng  
-                (550, 550),   # BLE beacon 3 - bệnh viện
-                (750, 750),   # BLE beacon 4 - nhà ga
+                {"id": "BLE-1", "pos": (150, 150)},   # BLE beacon 1 - cửa hàng
+                {"id": "BLE-2", "pos": (350, 350)},   # BLE beacon 2 - bảo tàng  
+                {"id": "BLE-3", "pos": (550, 550)},   # BLE beacon 3 - bệnh viện
+                {"id": "BLE-4", "pos": (750, 750)},   # BLE beacon 4 - nhà ga
             ]
         }
         
@@ -100,31 +101,33 @@ class SimulationEngine:
         self, 
         device_position: Tuple[int, int], 
         network_type: str
-    ) -> Tuple[Tuple[int, int], Dict[str, float]]:
+    ) -> Tuple[str | None, Dict[str, float]]:
         """Find the best base station for a network type using physics-based model.
         
         Selects station with best SNR (not necessarily closest due to shadowing).
         
         Returns:
-            Tuple (best base station position, QoS metrics)
+            Tuple (station_id, QoS metrics)
         """
         if network_type not in self.base_stations:
             return None, {
                 "bandwidth": 0.0,
                 "latency": 9999,
-                "packet_loss": 1.0,
+                "packet_loss_rate": 1.0,
                 "rssi": -999,
                 "snr": -999,
                 "is_available": False
             }
         
         stations = self.base_stations[network_type]
-        best_station = None
+        best_station_id = None
         best_qos = None
         best_snr = -999
         
         # Find station with best SNR (not necessarily closest)
-        for station_pos in stations:
+        for station in stations:
+            station_id = station["id"]
+            station_pos = station["pos"]
             distance = self._calculate_distance(device_position, station_pos)
             
             # Calculate QoS using physics-based model
@@ -133,7 +136,7 @@ class SimulationEngine:
             # Select station with best SNR
             if qos["is_available"] and qos["snr"] > best_snr:
                 best_snr = qos["snr"]
-                best_station = station_pos
+                best_station_id = station_id
                 best_qos = qos
         
         # If no station is available
@@ -141,13 +144,13 @@ class SimulationEngine:
             return None, {
                 "bandwidth": 0.0,
                 "latency": 9999,
-                "packet_loss": 1.0,
+                "packet_loss_rate": 1.0,
                 "rssi": -999,
                 "snr": -999,
                 "is_available": False
             }
         
-        return best_station, best_qos
+        return best_station_id, best_qos
     
     def _update_available_networks(self):
         """Update list of available networks for current position using physics model"""
@@ -155,7 +158,7 @@ class SimulationEngine:
         current_pos = self.device_state.position
         
         for network_type in self.network_configs.keys():
-            best_station, qos = self._find_best_base_station(current_pos, network_type)
+            station_id, qos = self._find_best_base_station(current_pos, network_type)
             
             # Only add if network is available (SNR > 0)
             if qos["is_available"]:
@@ -163,7 +166,11 @@ class SimulationEngine:
                     name=network_type,
                     bandwidth=qos["bandwidth"],
                     latency=qos["latency"],
-                    is_available=True
+                    is_available=True,
+                    station_id=station_id,
+                    rssi=qos.get("rssi"),
+                    snr=qos.get("snr"),
+                    packet_loss_rate=qos.get("packet_loss_rate")
                 )
                 available_networks.append(network_state)
         

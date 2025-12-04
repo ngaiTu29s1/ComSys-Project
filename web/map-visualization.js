@@ -18,11 +18,23 @@ class MapVisualization {
 
         // Map configuration
         this.mapSize = { width: 1000, height: 1000 };
-        this.canvasSize = { width: 800, height: 600 };
-        this.scale = {
-            x: this.canvasSize.width / this.mapSize.width,
-            y: this.canvasSize.height / this.mapSize.height
+
+        // CRITICAL: Read actual canvas size from element (not hardcoded!)
+        this.canvasSize = {
+            width: this.canvas.width,   // Get from canvas.width attribute
+            height: this.canvas.height  // Get from canvas.height attribute
         };
+
+        this.scale = {
+            x: this.canvasSize.width / this.mapSize.width,    // 800/1000 = 0.8
+            y: this.canvasSize.height / this.mapSize.height   // 600/1000 = 0.6
+        };
+
+        console.log('Canvas initialized:', {
+            canvasElement: { width: this.canvas.width, height: this.canvas.height },
+            mapSize: this.mapSize,
+            scale: this.scale
+        });
 
         // Simulation state
         this.devicePosition = { x: 0, y: 0 };
@@ -30,8 +42,10 @@ class MapVisualization {
         this.availableNetworks = [];
         this.simulationStep = 0;
         this.isAutoRunning = false;
+        this.autoRunTimer = null; // Store timer reference
         this.baseStations = [];
         this.decisionResult = null;
+        this.connectedStation = null; // Track which specific station device is connected to
 
         // Colors for different networks
         this.networkColors = {
@@ -98,13 +112,15 @@ class MapVisualization {
 
     async checkApiStatus() {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/health`);
+            // Use /status endpoint instead of /health (which doesn't exist)
+            const response = await fetch(`${this.apiBaseUrl}/status`);
             const data = await response.json();
 
             if (response.ok) {
                 document.getElementById('apiStatus').textContent = '✅ Online';
                 document.getElementById('apiStatus').style.color = '#4CAF50';
                 this.updateStatusBar('API connected successfully');
+                console.log('API Status:', data);
             } else {
                 throw new Error('API not responding');
             }
@@ -117,35 +133,36 @@ class MapVisualization {
     }
 
     initializeBaseStations() {
-        // Initialize base stations in a grid pattern (matching simulation.py)
+        // Initialize base stations - MUST MATCH app/services/simulation.py exactly!
         this.baseStations = [];
 
-        // Wi-Fi stations (4 stations)
+        // Wi-Fi stations (4 stations) - positions from simulation.py
         const wifiStations = [
-            { x: 200, y: 200, type: 'Wi-Fi' },
-            { x: 800, y: 200, type: 'Wi-Fi' },
-            { x: 200, y: 800, type: 'Wi-Fi' },
-            { x: 800, y: 800, type: 'Wi-Fi' }
+            { id: 'WiFi-1', x: 100, y: 100, type: 'Wi-Fi' },
+            { id: 'WiFi-2', x: 300, y: 250, type: 'Wi-Fi' },
+            { id: 'WiFi-3', x: 600, y: 400, type: 'Wi-Fi' },
+            { id: 'WiFi-4', x: 800, y: 750, type: 'Wi-Fi' }
         ];
 
-        // 5G stations (4 stations)  
+        // 5G stations (4 stations) - positions from simulation.py
         const fiveGStations = [
-            { x: 500, y: 150, type: '5G' },
-            { x: 150, y: 500, type: '5G' },
-            { x: 850, y: 500, type: '5G' },
-            { x: 500, y: 850, type: '5G' }
+            { id: '5G-1', x: 200, y: 200, type: '5G' },
+            { id: '5G-2', x: 500, y: 300, type: '5G' },
+            { id: '5G-3', x: 700, y: 600, type: '5G' },
+            { id: '5G-4', x: 900, y: 100, type: '5G' }
         ];
 
-        // BLE stations (4 stations)
+        // BLE stations (4 stations) - positions from simulation.py
         const bleStations = [
-            { x: 350, y: 350, type: 'BLE' },
-            { x: 650, y: 350, type: 'BLE' },
-            { x: 350, y: 650, type: 'BLE' },
-            { x: 650, y: 650, type: 'BLE' }
+            { id: 'BLE-1', x: 150, y: 150, type: 'BLE' },
+            { id: 'BLE-2', x: 350, y: 350, type: 'BLE' },
+            { id: 'BLE-3', x: 550, y: 550, type: 'BLE' },
+            { id: 'BLE-4', x: 750, y: 750, type: 'BLE' }
         ];
 
         this.baseStations = [...wifiStations, ...fiveGStations, ...bleStations];
-        this.updateStatusBar(`Initialized ${this.baseStations.length} base stations`);
+        console.log('Base stations initialized:', this.baseStations.length);
+        this.updateStatusBar(`Initialized ${this.baseStations.length} base stations (4 Wi-Fi, 4 5G, 4 BLE)`);
     }
 
     async runSimulationStep() {
@@ -246,6 +263,12 @@ class MapVisualization {
         try {
             this.updateStatusBar('🔄 Resetting simulation...');
 
+            // CRITICAL: Stop auto-run before reset
+            if (this.isAutoRunning) {
+                console.log('Stopping auto-run before reset');
+                this.toggleAutoRun();
+            }
+
             const response = await fetch(`${this.apiBaseUrl}/simulation/reset`, {
                 method: 'POST',
                 headers: {
@@ -268,6 +291,7 @@ class MapVisualization {
             this.draw();
 
             this.updateStatusBar('✅ Simulation reset successfully');
+            console.log('Simulation reset complete');
 
         } catch (error) {
             console.error('Reset failed:', error);
@@ -282,34 +306,106 @@ class MapVisualization {
         if (this.isAutoRunning) {
             toggle.classList.add('active');
             this.updateStatusBar('🔄 Auto-run enabled');
+            console.log('Auto-run STARTED');
         } else {
             toggle.classList.remove('active');
             this.updateStatusBar('⏸️ Auto-run disabled');
+            console.log('Auto-run STOPPED');
         }
     }
 
     startAutoRunTimer() {
-        setInterval(() => {
+        // Clear any existing timer
+        if (this.autoRunTimer) {
+            clearInterval(this.autoRunTimer);
+        }
+
+        // Start new timer
+        this.autoRunTimer = setInterval(() => {
             if (this.isAutoRunning) {
+                console.log('Auto-run tick: running simulation step');
                 this.runSimulationStep();
             }
         }, 2000); // Run every 2 seconds
+
+        console.log('Auto-run timer initialized');
     }
 
     handleCanvasClick(event) {
         const rect = this.canvas.getBoundingClientRect();
-        const x = Math.round((event.clientX - rect.left));
-        const y = Math.round((event.clientY - rect.top));
+
+        // Get click position relative to canvas bounds
+        const clickX = event.clientX - rect.left;
+        const clickY = event.clientY - rect.top;
+
+        // Scale from displayed size to canvas internal size
+        const displayToCanvasScaleX = this.canvas.width / rect.width;
+        const displayToCanvasScaleY = this.canvas.height / rect.height;
+
+        const canvasX = clickX * displayToCanvasScaleX;
+        const canvasY = clickY * displayToCanvasScaleY;
+
+        // Convert canvas pixels to map coordinates
+        const mapX = canvasX / this.scale.x;
+        const mapY = canvasY / this.scale.y;
+
+        // Round and clamp to map bounds
+        const clampedX = Math.max(0, Math.min(this.mapSize.width, Math.round(mapX)));
+        const clampedY = Math.max(0, Math.min(this.mapSize.height, Math.round(mapY)));
 
         // Update device position
-        this.devicePosition = { x, y };
-        console.log(`Device moved to (${x}, ${y})`);
+        this.devicePosition = { x: clampedX, y: clampedY };
+
+        // Clear decision result when manually placing device
+        this.decisionResult = null;
+        this.connectedStation = null;
+
+        // Recalculate available networks for new position
+        this.updateNetworksForPosition();
 
         // Redraw map and update UI
         this.draw();
         this.updateUI();
 
-        this.updateStatusBar(`Device moved to (${x}, ${y}) manually`);
+        this.updateStatusBar(`Device moved to (${clampedX}, ${clampedY}) manually`);
+    }
+
+    updateNetworksForPosition() {
+        // Calculate which networks are available at current device position
+        // This is a client-side approximation - backend has the physics model
+
+        this.availableNetworks = [];
+
+        // Check EVERY base station individually
+        this.baseStations.forEach(station => {
+            const dx = this.devicePosition.x - station.x;
+            const dy = this.devicePosition.y - station.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Rough approximation of availability (backend has exact physics)
+            const maxRange = station.type === 'BLE' ? 100 : (station.type === 'Wi-Fi' ? 200 : 400);
+
+            // If station is in range, add it to available networks
+            if (distance < maxRange) {
+                // Approximate QoS (not accurate - use backend for real values)
+                const signalStrength = 1 - (distance / maxRange);
+                const bandwidth = station.type === '5G' ? 100 * signalStrength :
+                    station.type === 'Wi-Fi' ? 80 * signalStrength :
+                        2 * signalStrength;
+                const latency = Math.round(10 + (distance / 10));
+
+                this.availableNetworks.push({
+                    name: station.type,
+                    station_id: station.id,
+                    bandwidth: bandwidth,
+                    latency: latency,
+                    distance: distance,
+                    is_available: true
+                });
+            }
+        });
+
+        console.log(`Position (${this.devicePosition.x}, ${this.devicePosition.y}): ${this.availableNetworks.length} stations available`);
     }
 
     handleResize() {
@@ -357,14 +453,17 @@ class MapVisualization {
 
         networkList.innerHTML = this.availableNetworks.map(network => {
             const badgeClass = `network-${network.name.toLowerCase().replace('-', '')}`;
+            const stationLabel = network.station_id || network.name;
+            const distanceText = network.distance ? ` • ${network.distance.toFixed(0)}m` : '';
+
             return `
                 <div class="network-item">
                     <div>
                         <div class="network-name">
-                            <span class="network-badge ${badgeClass}">${network.name}</span>
+                            <span class="network-badge ${badgeClass}">${stationLabel}</span>
                         </div>
                         <div class="network-stats">
-                            ${network.bandwidth.toFixed(1)} Mbps • ${network.latency}ms
+                            ${network.bandwidth.toFixed(1)} Mbps • ${network.latency}ms${distanceText}
                         </div>
                     </div>
                 </div>
@@ -452,7 +551,7 @@ class MapVisualization {
         this.baseStations.forEach(station => {
             const x = station.x * this.scale.x;
             const y = station.y * this.scale.y;
-            const radius = 8;
+            const radius = 10;
 
             // Draw station circle
             this.ctx.fillStyle = this.networkColors[station.type] || '#666';
@@ -465,110 +564,266 @@ class MapVisualization {
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
 
-            // Draw station label
-            this.ctx.fillStyle = '#333';
-            this.ctx.font = '10px Arial';
+            // Draw antenna icon in center
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 12px Arial';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(station.type, x, y + 20);
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText('📡', x, y);
+
+            // Draw station ID label with background
+            const label = station.id || station.type;
+            const labelWidth = this.ctx.measureText(label).width + 8;
+
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            this.ctx.fillRect(x - labelWidth / 2, y + 14, labelWidth, 14);
+
+            this.ctx.strokeStyle = this.networkColors[station.type];
+            this.ctx.lineWidth = 1;
+            this.ctx.strokeRect(x - labelWidth / 2, y + 14, labelWidth, 14);
+
+            this.ctx.fillStyle = '#333';
+            this.ctx.font = 'bold 9px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(label, x, y + 21);
         });
     }
 
     drawCoverageAreas() {
-        // Draw coverage areas for available networks
-        this.availableNetworks.forEach(network => {
-            // Find corresponding base station
-            const station = this.baseStations.find(s => s.type === network.name);
-            if (!station) return;
+        // Draw coverage areas for all base stations (not just available)
+        // Show realistic range based on network type
 
+        const coverageRanges = {
+            'Wi-Fi': 200,   // meters - indoor coverage
+            '5G': 400,      // meters - outdoor urban
+            'BLE': 100      // meters - short range
+        };
+
+        this.baseStations.forEach(station => {
             const x = station.x * this.scale.x;
             const y = station.y * this.scale.y;
+            const maxRange = coverageRanges[station.type] || 200;
+            const radius = maxRange * this.scale.x;
 
-            // Calculate coverage radius based on signal quality
-            const maxRadius = 150 * this.scale.x; // Max coverage radius
-            const signalQuality = Math.min(network.bandwidth / 100, 1); // Normalize to 0-1
-            const radius = maxRadius * signalQuality;
+            // Check if device is within this station's range
+            const dx = this.devicePosition.x - station.x;
+            const dy = this.devicePosition.y - station.y;
+            const deviceDistance = Math.sqrt(dx * dx + dy * dy);
+            const isInRange = deviceDistance < maxRange;
 
-            // Draw coverage area
-            this.ctx.fillStyle = this.networkColors[network.name] + '20'; // Semi-transparent
-            this.ctx.strokeStyle = this.networkColors[network.name] + '60';
-            this.ctx.lineWidth = 1;
+            // Draw coverage circle
+            this.ctx.fillStyle = this.networkColors[station.type] + (isInRange ? '30' : '10');
+            this.ctx.strokeStyle = this.networkColors[station.type] + (isInRange ? '80' : '30');
+            this.ctx.lineWidth = isInRange ? 2 : 1;
+            this.ctx.setLineDash(isInRange ? [] : [5, 5]);
 
             this.ctx.beginPath();
             this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
             this.ctx.fill();
             this.ctx.stroke();
+
+            this.ctx.setLineDash([]);
         });
     }
 
     drawDevice() {
         const x = this.devicePosition.x * this.scale.x;
         const y = this.devicePosition.y * this.scale.y;
-        const radius = 12;
+        const radius = 14;
+
+        // Draw pulsing ring for better visibility
+        this.ctx.strokeStyle = 'rgba(255, 68, 68, 0.4)';
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, radius + 6, 0, 2 * Math.PI);
+        this.ctx.stroke();
 
         // Draw device circle
         this.ctx.fillStyle = '#FF4444';
         this.ctx.strokeStyle = 'white';
         this.ctx.lineWidth = 3;
-
         this.ctx.beginPath();
         this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
         this.ctx.fill();
         this.ctx.stroke();
 
-        // Draw device icon (simple IoT symbol)
+        // Draw center dot for precise position
         this.ctx.fillStyle = 'white';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('📱', x, y + 3);
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, 3, 0, 2 * Math.PI);
+        this.ctx.fill();
 
-        // Draw task indicator
+        // Draw device icon
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = '16px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('📡', x, y);
+
+        // Task indicator badge
         const taskColors = {
-            'IDLE_MONITORING': '#2196F3',
+            'IDLE_MONITORING': '#4CAF50',
             'DATA_BURST_ALERT': '#FF9800',
             'VIDEO_STREAMING': '#E91E63'
         };
 
+        const taskLabels = {
+            'IDLE_MONITORING': 'I',
+            'DATA_BURST_ALERT': 'A',
+            'VIDEO_STREAMING': 'V'
+        };
+
+        const badgeX = x + 20;
+        const badgeY = y - 20;
+
         this.ctx.fillStyle = taskColors[this.currentTask] || '#666';
+        this.ctx.strokeStyle = 'white';
+        this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.arc(x + 15, y - 15, 4, 0, 2 * Math.PI);
+        this.ctx.arc(badgeX, badgeY, 7, 0, 2 * Math.PI);
         this.ctx.fill();
+        this.ctx.stroke();
+
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = 'bold 10px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(taskLabels[this.currentTask] || '?', badgeX, badgeY);
+
+        // Position label
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(x - 35, y + 25, 70, 16);
+
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = 'bold 10px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(`(${this.devicePosition.x}, ${this.devicePosition.y})`, x, y + 33);
     }
 
     drawNetworkConnections() {
         if (!this.decisionResult) return;
 
-        // Find the selected network base station
-        const selectedStation = this.baseStations.find(s => s.type === this.decisionResult.selectedNetwork);
-        if (!selectedStation) return;
+        const networkType = this.decisionResult.selectedNetwork;
+        const stationsOfType = this.baseStations.filter(s => s.type === networkType);
+
+        if (stationsOfType.length === 0) return;
+
+        // Find closest station of the selected type
+        let closestStation = null;
+        let minDistance = Infinity;
+
+        stationsOfType.forEach(station => {
+            const dx = this.devicePosition.x - station.x;
+            const dy = this.devicePosition.y - station.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestStation = station;
+            }
+        });
+
+        if (!closestStation) return;
+
+        // Store for reference
+        this.connectedStation = closestStation;
 
         const deviceX = this.devicePosition.x * this.scale.x;
         const deviceY = this.devicePosition.y * this.scale.y;
-        const stationX = selectedStation.x * this.scale.x;
-        const stationY = selectedStation.y * this.scale.y;
+        const stationX = closestStation.x * this.scale.x;
+        const stationY = closestStation.y * this.scale.y;
 
         // Draw connection line
-        this.ctx.strokeStyle = this.networkColors[this.decisionResult.selectedNetwork];
+        this.ctx.strokeStyle = this.networkColors[networkType];
         this.ctx.lineWidth = 3;
-        this.ctx.setLineDash([5, 5]);
-
+        this.ctx.setLineDash([8, 4]);
         this.ctx.beginPath();
         this.ctx.moveTo(deviceX, deviceY);
         this.ctx.lineTo(stationX, stationY);
         this.ctx.stroke();
+        this.ctx.setLineDash([]);
 
-        this.ctx.setLineDash([]); // Reset line dash
+        // Highlight connected station
+        this.ctx.strokeStyle = this.networkColors[networkType];
+        this.ctx.lineWidth = 4;
+        this.ctx.setLineDash([2, 2]);
+        this.ctx.beginPath();
+        this.ctx.arc(stationX, stationY, 16, 0, 2 * Math.PI);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
 
-        // Draw connection label
+        // Find network state for detailed metrics
+        const networkState = this.availableNetworks.find(n => n.name === networkType);
+
+        // Draw detailed info box
         const midX = (deviceX + stationX) / 2;
         const midY = (deviceY + stationY) / 2;
 
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        this.ctx.fillRect(midX - 30, midY - 8, 60, 16);
+        const boxWidth = 150;
+        const boxHeight = networkState ? 95 : 45;
+        const boxX = midX - boxWidth / 2;
+        const boxY = midY - boxHeight / 2;
 
-        this.ctx.fillStyle = this.networkColors[this.decisionResult.selectedNetwork];
-        this.ctx.font = '11px Arial';
+        // Box background
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        this.ctx.strokeStyle = this.networkColors[networkType];
+        this.ctx.lineWidth = 2;
+        this.ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+        this.ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+        // Header with station ID
+        this.ctx.fillStyle = this.networkColors[networkType];
+        this.ctx.fillRect(boxX, boxY, boxWidth, 20);
+
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = 'bold 11px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(`${this.decisionResult.cost.toFixed(1)}`, midX, midY + 3);
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(`📡 ${closestStation.id}`, midX, boxY + 10);
+
+        if (networkState) {
+            // Metrics
+            this.ctx.fillStyle = '#333';
+            this.ctx.font = '9px Consolas, monospace';
+            this.ctx.textAlign = 'left';
+
+            let lineY = boxY + 30;
+            const lineHeight = 11;
+            const leftMargin = boxX + 8;
+
+            this.ctx.fillText(`📶 BW: ${networkState.bandwidth.toFixed(1)} Mbps`, leftMargin, lineY);
+            lineY += lineHeight;
+            this.ctx.fillText(`⏱️ Lat: ${networkState.latency} ms`, leftMargin, lineY);
+            lineY += lineHeight;
+
+            if (networkState.rssi !== undefined) {
+                this.ctx.fillText(`📡 RSSI: ${networkState.rssi.toFixed(1)} dBm`, leftMargin, lineY);
+                lineY += lineHeight;
+            }
+
+            if (networkState.snr !== undefined) {
+                this.ctx.fillText(`🔊 SNR: ${networkState.snr.toFixed(1)} dB`, leftMargin, lineY);
+                lineY += lineHeight;
+            }
+
+            if (networkState.packet_loss_rate !== undefined) {
+                this.ctx.fillText(`📉 PLR: ${(networkState.packet_loss_rate * 100).toFixed(1)}%`, leftMargin, lineY);
+                lineY += lineHeight;
+            }
+
+            // Distance and cost footer
+            this.ctx.fillStyle = '#666';
+            this.ctx.font = 'bold 9px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(`${minDistance.toFixed(0)}m • Cost: ${this.decisionResult.cost.toFixed(2)}`, midX, boxY + boxHeight - 8);
+        } else {
+            this.ctx.fillStyle = '#666';
+            this.ctx.font = '10px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(`Distance: ${minDistance.toFixed(0)}m`, midX, boxY + 32);
+        }
     }
 }
 

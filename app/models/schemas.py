@@ -34,6 +34,10 @@ class NetworkState(BaseModel):
     bandwidth: float = Field(..., gt=0, description="Available bandwidth (Mbps)")
     latency: int = Field(..., gt=0, description="Latency (ms)")
     is_available: bool = Field(..., description="Network availability status")
+    station_id: str | None = Field(None, description="ID of the base station providing service")
+    rssi: float | None = Field(None, description="Received Signal Strength Indicator (dBm)")
+    snr: float | None = Field(None, description="Signal-to-Noise Ratio (dB)")
+    packet_loss_rate: float | None = Field(None, description="Packet Loss Rate (0-1)")
 
     model_config = {
         "json_schema_extra": {

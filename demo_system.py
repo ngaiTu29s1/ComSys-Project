@@ -7,12 +7,14 @@ Chạy: python demo_system.py
 
 import sys
 import os
+import math
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.models.schemas import TaskState, NetworkState, NetworkConfig, DeviceState
 from app.core.decision_logic import (
     select_best_network, calculate_cost, TASK_WEIGHTS, QOS_REQUIREMENTS
 )
+from app.services.network_physics import NetworkPhysics
 
 
 def print_header(title: str):
@@ -20,6 +22,26 @@ def print_header(title: str):
     print("\n" + "=" * 70)
     print(f"🔥 {title}")
     print("=" * 70)
+
+
+def create_network_state_from_distance(network_type: str, distance: float) -> NetworkState:
+    """Create realistic NetworkState based on distance using physics model.
+    
+    Args:
+        network_type: Type of network (Wi-Fi, 5G, BLE)
+        distance: Distance from base station (meters)
+    
+    Returns:
+        NetworkState with realistic QoS metrics
+    """
+    qos = NetworkPhysics.calculate_qos(network_type, distance)
+    
+    return NetworkState(
+        name=network_type,
+        bandwidth=round(qos["bandwidth"], 1),
+        latency=qos["latency"],
+        is_available=qos["is_available"]
+    )
 
 
 def demo_basic_algorithm():
@@ -60,18 +82,23 @@ def demo_scenario_1_office_environment():
     configs = {
         "Wi-Fi": NetworkConfig(name="Wi-Fi", energy_tx=0.5, energy_idle=10.0, energy_wakeup=2.0),
         "5G": NetworkConfig(name="5G", energy_tx=1.2, energy_idle=15.0, energy_wakeup=5.0),
-        "Ethernet": NetworkConfig(name="Ethernet", energy_tx=0.3, energy_idle=5.0, energy_wakeup=0.0)
+        "BLE": NetworkConfig(name="BLE", energy_tx=0.1, energy_idle=2.0, energy_wakeup=0.5)
     }
     
+    # Device at office desk: close to Wi-Fi (30m), moderate 5G (80m), close to BLE beacon (15m)
+    print("🏢 Thiết bị IoT tại bàn làm việc - Tính QoS dựa trên khoảng cách thực tế:")
+    print("  📍 Wi-Fi router: 30m | 5G tower: 80m | BLE beacon: 15m\n")
+    
     office_networks = [
-        NetworkState(name="Wi-Fi", bandwidth=100.0, latency=10, is_available=True),
-        NetworkState(name="5G", bandwidth=200.0, latency=15, is_available=True), 
-        NetworkState(name="Ethernet", bandwidth=1000.0, latency=5, is_available=True)
+        create_network_state_from_distance("Wi-Fi", 30),
+        create_network_state_from_distance("5G", 80),
+        create_network_state_from_distance("BLE", 15)
     ]
     
-    print("🏢 Thiết bị IoT trong văn phòng - 3 mạng khả dụng:")
+    print("📶 QoS metrics (calculated by physics model):")
     for net in office_networks:
-        print(f"  📶 {net.name}: {net.bandwidth} Mbps, {net.latency}ms")
+        status = "✅" if net.is_available else "❌"
+        print(f"  {status} {net.name}: {net.bandwidth} Mbps, {net.latency}ms")
     
     print("\n🧪 Test các tasks khác nhau:")
     
@@ -105,44 +132,67 @@ def demo_scenario_2_mobile_environment():
     
     configs = {
         "Wi-Fi": NetworkConfig(name="Wi-Fi", energy_tx=0.5, energy_idle=10.0, energy_wakeup=2.0),
-        "4G": NetworkConfig(name="4G", energy_tx=0.8, energy_idle=12.0, energy_wakeup=3.0),
         "5G": NetworkConfig(name="5G", energy_tx=1.2, energy_idle=15.0, energy_wakeup=5.0)
     }
     
-    # Kịch bản A: Wi-Fi yếu
-    print("\n📍 Vị trí A: Gần router Wi-Fi")
+    # Kịch bản A: Gần router Wi-Fi
+    print("\n📍 Vị trí A: Gần router Wi-Fi (20m from Wi-Fi, 100m from 5G)")
     good_wifi = [
-        NetworkState(name="Wi-Fi", bandwidth=80.0, latency=8, is_available=True),
-        NetworkState(name="4G", bandwidth=30.0, latency=50, is_available=True)
+        create_network_state_from_distance("Wi-Fi", 20),
+        create_network_state_from_distance("5G", 100)
     ]
     
-    for task in TaskState:
-        best_net, cost = select_best_network(good_wifi, configs, task)
-        print(f"  {task.value}: Chọn {best_net.name} (cost: {cost:.2f})")
+    print("  📶 Available networks:")
+    for net in good_wifi:
+        if net.is_available:
+            print(f"    {net.name}: {net.bandwidth} Mbps, {net.latency}ms")
     
-    # Kịch bản B: Xa router, chỉ có cellular  
-    print("\n📍 Vị trí B: Xa Wi-Fi, chỉ có cellular")
+    for task in TaskState:
+        available = [n for n in good_wifi if n.is_available]
+        if available:
+            best_net, cost = select_best_network(available, configs, task)
+            print(f"  {task.value}: Chọn {best_net.name} (cost: {cost:.2f})")
+    
+    # Kịch bản B: Xa router, chỉ có cellular
+    print("\n📍 Vị trí B: Xa Wi-Fi, chỉ có cellular (200m from Wi-Fi, 50m from 5G)")
     cellular_only = [
-        NetworkState(name="4G", bandwidth=25.0, latency=60, is_available=True),
-        NetworkState(name="5G", bandwidth=150.0, latency=25, is_available=True)
+        create_network_state_from_distance("Wi-Fi", 200),
+        create_network_state_from_distance("5G", 50)
     ]
+    
+    print("  📶 Available networks:")
+    for net in cellular_only:
+        if net.is_available:
+            print(f"    {net.name}: {net.bandwidth} Mbps, {net.latency}ms")
     
     for task in TaskState:
-        best_net, cost = select_best_network(cellular_only, configs, task)
-        print(f"  {task.value}: Chọn {best_net.name} (cost: {cost:.2f})")
+        available = [n for n in cellular_only if n.is_available]
+        if available:
+            best_net, cost = select_best_network(available, configs, task)
+            print(f"  {task.value}: Chọn {best_net.name} (cost: {cost:.2f})")
     
-    # Kịch bản C: Mạng quá tải
-    print("\n📍 Vị trí C: Tất cả mạng đều chậm (congested)")
-    congested_nets = [
-        NetworkState(name="Wi-Fi", bandwidth=5.0, latency=200, is_available=True),   # Quá tải
-        NetworkState(name="4G", bandwidth=2.0, latency=300, is_available=True),     # Rất chậm
-        NetworkState(name="5G", bandwidth=10.0, latency=100, is_available=True)     # Chậm
+    # Kịch bản C: Rất xa tất cả stations
+    print("\n📍 Vị trí C: Ở rìa vùng phủ sóng (150m from Wi-Fi, 300m from 5G)")
+    far_distance = [
+        create_network_state_from_distance("Wi-Fi", 150),
+        create_network_state_from_distance("5G", 300)
     ]
+    
+    print("  📶 Available networks:")
+    available_nets = [n for n in far_distance if n.is_available]
+    if available_nets:
+        for net in available_nets:
+            print(f"    {net.name}: {net.bandwidth} Mbps, {net.latency}ms")
+    else:
+        print("    ❌ No networks available!")
     
     for task in TaskState:
         try:
-            best_net, cost = select_best_network(congested_nets, configs, task)
-            print(f"  {task.value}: Chọn {best_net.name} (cost: {cost:.2f}) ⚠️  High cost!")
+            if available_nets:
+                best_net, cost = select_best_network(available_nets, configs, task)
+                print(f"  {task.value}: Chọn {best_net.name} (cost: {cost:.2f}) ⚠️  Weak signal!")
+            else:
+                print(f"  {task.value}: ❌ No network available")
         except Exception as e:
             print(f"  {task.value}: ❌ {e}")
 
@@ -154,39 +204,52 @@ def demo_scenario_3_iot_sensors():
     configs = {
         "Wi-Fi": NetworkConfig(name="Wi-Fi", energy_tx=0.5, energy_idle=10.0, energy_wakeup=2.0),
         "BLE": NetworkConfig(name="BLE", energy_tx=0.05, energy_idle=1.0, energy_wakeup=0.1),     # Rất tiết kiệm
-        "LoRa": NetworkConfig(name="LoRa", energy_tx=0.02, energy_idle=0.5, energy_wakeup=0.05)   # Cực tiết kiệm
+        "5G": NetworkConfig(name="5G", energy_tx=1.2, energy_idle=15.0, energy_wakeup=5.0)
     }
     
+    # Sensor trong nhà: Wi-Fi (40m), BLE beacon (10m), 5G (120m)
+    print("🔋 Cảm biến IoT trong nhà (pin sạc khó):")
+    print("  📍 Wi-Fi: 40m | BLE beacon: 10m | 5G tower: 120m\n")
+    
     sensor_networks = [
-        NetworkState(name="Wi-Fi", bandwidth=50.0, latency=15, is_available=True),
-        NetworkState(name="BLE", bandwidth=1.0, latency=50, is_available=True),
-        NetworkState(name="LoRa", bandwidth=0.05, latency=1000, is_available=True)  # Rất chậm nhưng tiết kiệm
+        create_network_state_from_distance("Wi-Fi", 40),
+        create_network_state_from_distance("BLE", 10),
+        create_network_state_from_distance("5G", 120)
     ]
     
-    print("🔋 Mạng cho cảm biến IoT (pin sạc khó):")
+    print("📡 QoS metrics (physics-based):")
     for net in sensor_networks:
-        config = configs[net.name]
-        print(f"  📡 {net.name}: BW={net.bandwidth} Mbps, Energy_TX={config.energy_tx} mJ/KB")
+        if net.is_available:
+            config = configs[net.name]
+            print(f"  ✅ {net.name}: BW={net.bandwidth} Mbps, Latency={net.latency}ms, Energy_TX={config.energy_tx} mJ/KB")
+        else:
+            print(f"  ❌ {net.name}: Out of range")
     
     print("\n🧪 Lựa chọn mạng cho từng task:")
     
+    available = [n for n in sensor_networks if n.is_available]
+    
     for task in TaskState:
-        best_net, cost = select_best_network(sensor_networks, configs, task)
-        config = configs[best_net.name]
-        
-        print(f"\n📋 {task.value}:")
-        print(f"  ✅ Chọn: {best_net.name}")
-        print(f"  💰 Chi phí: {cost:.2f}")
-        print(f"  ⚡ Energy TX: {config.energy_tx} mJ/KB")
-        print(f"  📶 Bandwidth: {best_net.bandwidth} Mbps")
-        
-        # Kiểm tra xem có phải lựa chọn hợp lý không
-        if task == TaskState.IDLE_MONITORING and best_net.name in ["BLE", "LoRa"]:
-            print("  ✅ Hợp lý: Chọn mạng tiết kiệm cho IDLE")
-        elif task == TaskState.DATA_BURST_ALERT and best_net.bandwidth >= 5.0:
-            print("  ✅ Hợp lý: Đủ bandwidth cho DATA_BURST") 
-        elif task == TaskState.VIDEO_STREAMING and best_net.bandwidth < 10.0:
-            print("  ⚠️  Cảnh báo: Bandwidth có thể không đủ cho VIDEO")
+        if available:
+            best_net, cost = select_best_network(available, configs, task)
+            config = configs[best_net.name]
+            
+            print(f"\n📋 {task.value}:")
+            print(f"  ✅ Chọn: {best_net.name}")
+            print(f"  💰 Chi phí: {cost:.2f}")
+            print(f"  ⚡ Energy TX: {config.energy_tx} mJ/KB")
+            print(f"  📶 Bandwidth: {best_net.bandwidth} Mbps")
+            print(f"  🕐 Latency: {best_net.latency} ms")
+            
+            # Kiểm tra xem có phải lựa chọn hợp lý không
+            if task == TaskState.IDLE_MONITORING and best_net.name == "BLE":
+                print("  ✅ Hợp lý: Chọn BLE tiết kiệm năng lượng cho IDLE")
+            elif task == TaskState.DATA_BURST_ALERT and best_net.bandwidth >= 5.0:
+                print("  ✅ Hợp lý: Đủ bandwidth cho DATA_BURST") 
+            elif task == TaskState.VIDEO_STREAMING and best_net.bandwidth < 10.0:
+                print(f"  ⚠️  Cảnh báo: Bandwidth {best_net.bandwidth} Mbps có thể không đủ cho VIDEO")
+        else:
+            print(f"\n📋 {task.value}: ❌ No networks available")
 
 
 def demo_real_world_device_simulation():
@@ -199,48 +262,78 @@ def demo_real_world_device_simulation():
         "BLE": NetworkConfig(name="BLE", energy_tx=0.1, energy_idle=2.0, energy_wakeup=0.5)
     }
     
+    # Base station positions (fixed)
+    base_stations = {
+        "wifi_home": (10, 10),
+        "wifi_office": (100, 60),
+        "5g_tower1": (0, 0),
+        "5g_tower2": (80, 30),
+        "ble_home": (5, 5),
+        "ble_office": (95, 55)
+    }
+    
+    # Device movement trajectory with distances calculated
+    def calculate_distance(pos1, pos2):
+        return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
+    
     # Giả lập thiết bị di chuyển qua 5 vị trí khác nhau
-    locations = [
-        {
-            "name": "🏠 Tại nhà", 
-            "position": (0, 0),
-            "networks": [
-                NetworkState(name="Wi-Fi", bandwidth=100.0, latency=5, is_available=True),
-                NetworkState(name="5G", bandwidth=80.0, latency=20, is_available=True)
-            ]
-        },
-        {
-            "name": "🚗 Trên xe", 
-            "position": (50, 25),
-            "networks": [
-                NetworkState(name="5G", bandwidth=150.0, latency=15, is_available=True)
-            ]
-        },
-        {
-            "name": "🏢 Văn phòng",
-            "position": (100, 50), 
-            "networks": [
-                NetworkState(name="Wi-Fi", bandwidth=200.0, latency=8, is_available=True),
-                NetworkState(name="BLE", bandwidth=1.0, latency=30, is_available=True)
-            ]
-        },
-        {
-            "name": "☕ Quán café",
-            "position": (75, 100),
-            "networks": [
-                NetworkState(name="Wi-Fi", bandwidth=20.0, latency=50, is_available=True),  # WiFi công cộng chậm
-                NetworkState(name="5G", bandwidth=100.0, latency=25, is_available=True)
-            ]
-        },
-        {
-            "name": "🌳 Công viên",
-            "position": (25, 150), 
-            "networks": [
-                NetworkState(name="5G", bandwidth=60.0, latency=40, is_available=True),    # Sóng yếu
-                NetworkState(name="BLE", bandwidth=0.5, latency=100, is_available=True)
-            ]
-        }
+    device_positions = [
+        {"name": "🏠 Tại nhà", "position": (15, 12)},
+        {"name": "🚗 Trên xe", "position": (50, 25)},
+        {"name": "🏢 Văn phòng", "position": (105, 58)},
+        {"name": "☕ Quán café", "position": (75, 100)},
+        {"name": "🌳 Công viên", "position": (25, 150)}
     ]
+    
+    locations = []
+    for dev_pos in device_positions:
+        # Calculate QoS based on real distances
+        networks = []
+        
+        # Check Wi-Fi availability from both routers
+        wifi_home_dist = calculate_distance(dev_pos["position"], base_stations["wifi_home"])
+        wifi_office_dist = calculate_distance(dev_pos["position"], base_stations["wifi_office"])
+        wifi_dist = min(wifi_home_dist, wifi_office_dist)
+        wifi_qos = NetworkPhysics.calculate_qos("Wi-Fi", wifi_dist)
+        if wifi_qos["is_available"]:
+            networks.append(NetworkState(
+                name="Wi-Fi",
+                bandwidth=round(wifi_qos["bandwidth"], 1),
+                latency=wifi_qos["latency"],
+                is_available=True
+            ))
+        
+        # Check 5G availability from both towers
+        tower1_dist = calculate_distance(dev_pos["position"], base_stations["5g_tower1"])
+        tower2_dist = calculate_distance(dev_pos["position"], base_stations["5g_tower2"])
+        fiveg_dist = min(tower1_dist, tower2_dist)
+        fiveg_qos = NetworkPhysics.calculate_qos("5G", fiveg_dist)
+        if fiveg_qos["is_available"]:
+            networks.append(NetworkState(
+                name="5G",
+                bandwidth=round(fiveg_qos["bandwidth"], 1),
+                latency=fiveg_qos["latency"],
+                is_available=True
+            ))
+        
+        # Check BLE availability from both beacons
+        ble_home_dist = calculate_distance(dev_pos["position"], base_stations["ble_home"])
+        ble_office_dist = calculate_distance(dev_pos["position"], base_stations["ble_office"])
+        ble_dist = min(ble_home_dist, ble_office_dist)
+        ble_qos = NetworkPhysics.calculate_qos("BLE", ble_dist)
+        if ble_qos["is_available"]:
+            networks.append(NetworkState(
+                name="BLE",
+                bandwidth=round(ble_qos["bandwidth"], 1),
+                latency=ble_qos["latency"],
+                is_available=True
+            ))
+        
+        locations.append({
+            "name": dev_pos["name"],
+            "position": dev_pos["position"],
+            "networks": networks
+        })
     
     # Tasks mà thiết bị cần thực hiện ở mỗi vị trí
     location_tasks = [

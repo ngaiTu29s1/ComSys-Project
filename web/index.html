@@ -56,9 +56,19 @@
             border: 2px solid #ddd;
             border-radius: 8px;
             background: #f8f9fa;
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+
+        .canvas-wrapper {
             flex: 1;
-            position: relative;
-            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
         }
 
         .control-panel {
@@ -380,7 +390,9 @@
                     </div>
                 </div>
             </div>
-            <canvas id="mapCanvas" class="map-canvas" width="800" height="600"></canvas>
+            <div class="canvas-wrapper">
+                <canvas id="mapCanvas" class="map-canvas" width="800" height="600"></canvas>
+            </div>
             <div class="status-bar" id="statusBar">
                 Ready - Click "Start Simulation" to begin
             </div>
