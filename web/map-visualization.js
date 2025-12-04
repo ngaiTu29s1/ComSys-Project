@@ -13,8 +13,13 @@ class MapVisualization {
         this.canvas = document.getElementById('mapCanvas');
         this.ctx = this.canvas.getContext('2d');
 
-        // API configuration
-        this.apiBaseUrl = 'http://localhost:8000';
+        // API configuration - use current origin to avoid CORS issues
+        this.apiBaseUrl = window.location.origin;
+
+        console.log('🌐 MapVisualization initialized');
+        console.log('   API Base URL:', this.apiBaseUrl);
+        console.log('   Origin:', window.location.origin);
+        console.log('   Hostname:', window.location.hostname);
 
         // Map configuration
         this.mapSize = { width: 1000, height: 1000 };
@@ -37,7 +42,7 @@ class MapVisualization {
         });
 
         // Simulation state
-        this.devicePosition = { x: 0, y: 0 };
+        this.devicePosition = { x: 150, y: 150 }; // Start near WiFi-1 (100,100) and BLE-1 (150,150)
         this.currentTask = 'IDLE_MONITORING';
         this.availableNetworks = [];
         this.simulationStep = 0;
@@ -63,6 +68,9 @@ class MapVisualization {
         this.setupEventListeners();
         this.checkApiStatus();
         this.initializeBaseStations();
+        this.initializeUIState(); // Initialize UI state on load
+        this.updateNetworksForPosition(); // Calculate available networks for initial position
+        this.updateUI(); // Update UI to show initial state
         this.draw();
         this.startAutoRunTimer();
     }
@@ -154,7 +162,30 @@ class MapVisualization {
         }
     }
 
-    initializeBaseStations() {
+    initializeUIState() {
+        // Initialize UI state to match toggle default (active = AI mode)
+        const useAIToggle = document.getElementById('useAIToggle');
+        const isAI = useAIToggle.classList.contains('active');
+
+        console.log('🎨 Initializing UI State...');
+        console.log('   Toggle element found:', !!useAIToggle);
+        console.log('   Toggle has "active" class:', isAI);
+        console.log('   Current body classes:', document.body.className);
+
+        // Set body class and mode indicator
+        if (isAI) {
+            document.body.classList.remove('mcdm-mode');
+            document.body.classList.add('ai-mode');
+            document.getElementById('modeIndicator').textContent = 'AI MODE';
+        } else {
+            document.body.classList.remove('ai-mode');
+            document.body.classList.add('mcdm-mode');
+            document.getElementById('modeIndicator').textContent = 'MCDM MODE';
+        }
+
+        console.log('   Final body classes:', document.body.className);
+        console.log('   Mode:', isAI ? 'AI MODE' : 'MCDM MODE');
+    } initializeBaseStations() {
         // Initialize base stations - MUST MATCH app/services/simulation.py exactly!
         this.baseStations = [];
 
@@ -210,7 +241,11 @@ class MapVisualization {
                 y: data.device_state.position[1]
             };
             this.currentTask = data.device_state.current_task;
-            this.availableNetworks = data.device_state.available_networks;
+            // Ensure all networks have is_available field
+            this.availableNetworks = data.device_state.available_networks.map(net => ({
+                ...net,
+                is_available: net.is_available !== undefined ? net.is_available : true
+            }));
             this.simulationStep = data.step;
 
             // Update decision result if available
@@ -236,7 +271,8 @@ class MapVisualization {
 
     async makeDecision() {
         if (this.availableNetworks.length === 0) {
-            this.updateStatusBar('⚠️ No networks available for decision making');
+            this.updateStatusBar('⚠️ No networks available - Please move device or run simulation step');
+            alert('No networks detected at current position! Click on canvas to move device or run a simulation step.');
             return;
         }
 
@@ -246,6 +282,8 @@ class MapVisualization {
             const useAI = useAIToggle.classList.contains('active');
             const endpoint = useAI ? '/decision/ml' : '/decision';
 
+            console.log('Making decision with endpoint:', endpoint, 'Toggle active:', useAI);
+            console.log('Available networks:', this.availableNetworks);
             this.updateStatusBar(useAI ? '🤖 Making AI/ML decision...' : '📐 Making MCDM decision...');
 
             const payload = {
@@ -253,6 +291,8 @@ class MapVisualization {
                 current_task: this.currentTask,
                 available_networks: this.availableNetworks
             };
+
+            console.log('Sending payload:', JSON.stringify(payload, null, 2));
 
             const response = await fetch(`${this.apiBaseUrl}${endpoint}`, {
                 method: 'POST',
@@ -263,16 +303,23 @@ class MapVisualization {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const errorText = await response.text();
+                console.error('Response error:', errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 200)}`);
             }
 
             const data = await response.json();
+            console.log('Response data:', data);
+            console.log('Method:', data.method);
+            console.log('Confidence:', data.confidence);
+            console.log('Station ID:', data.station_id);
 
             // Handle different response formats (ML vs MCDM)
             if (useAI) {
                 // ML response format
                 this.decisionResult = {
-                    selectedNetwork: data.selected_network,
+                    selectedNetwork: data.station_id || data.selected_network, // Use station_id for specific identification
+                    networkType: data.selected_network, // Keep network type separately
                     stationId: data.station_id,
                     method: data.method,
                     confidence: data.confidence,
@@ -281,7 +328,8 @@ class MapVisualization {
                     algorithm: 'Machine Learning'
                 };
                 this.connectedStation = data.station_id;
-                this.updateStatusBar(`✅ [AI] Selected: ${data.selected_network} (Conf: ${(data.confidence * 100).toFixed(1)}%)`);
+                const confPercent = data.confidence !== null ? (data.confidence * 100).toFixed(1) : '0.0';
+                this.updateStatusBar(`✅ [AI] Selected: ${data.station_id || data.selected_network} (Conf: ${confPercent}%)`);
             } else {
                 // MCDM response format
                 this.decisionResult = {
@@ -301,7 +349,12 @@ class MapVisualization {
 
         } catch (error) {
             console.error('Decision making failed:', error);
-            this.updateStatusBar('❌ Decision making failed');
+            console.error('Error details:', error.message);
+            console.error('Stack:', error.stack);
+
+            // Show detailed error to user
+            const errorMsg = error.message || 'Unknown error';
+            this.updateStatusBar(`❌ Decision failed: ${errorMsg}`);
         }
     }
 
@@ -440,13 +493,21 @@ class MapVisualization {
                         2 * signalStrength;
                 const latency = Math.round(10 + (distance / 10));
 
+                // Approximate signal quality metrics
+                const rssi = -30 - (distance / 10); // dBm
+                const snr = 40 - (distance / 20);   // dB
+                const packet_loss = Math.min(0.1, distance / 1000);
+
                 this.availableNetworks.push({
                     name: station.type,
                     station_id: station.id,
                     bandwidth: bandwidth,
                     latency: latency,
                     distance: distance,
-                    is_available: true
+                    is_available: true,
+                    rssi: rssi,
+                    snr: snr,
+                    packet_loss_rate: packet_loss
                 });
             }
         });
@@ -534,53 +595,161 @@ class MapVisualization {
         const decisionMethod = document.getElementById('decisionMethod');
         const confidenceMetric = document.getElementById('confidenceMetric');
         const costMetric = document.getElementById('costMetric');
+        const decisionMetricHeader = document.getElementById('decisionMetricHeader');
 
-        if (this.decisionResult.method === 'ML' || this.decisionResult.method === 'MCDM_Fallback') {
+        const isAIMode = this.decisionResult.method === 'ML' || this.decisionResult.method === 'MCDM_Fallback';
+        const isFallback = this.decisionResult.method === 'MCDM_Fallback';
+
+        if (isAIMode) {
             // AI/ML mode
-            decisionMethod.textContent = 'AI SELECTED';
-
-            // Show confidence, hide cost
+            decisionMethod.textContent = isFallback ? 'AI (FALLBACK)' : 'AI SELECTED';
             confidenceMetric.style.display = 'block';
             costMetric.style.display = 'none';
+            decisionMetricHeader.innerHTML = 'Conf/Cost<br><small>(% / ~)</small>';
 
             const confidence = this.decisionResult.confidence !== null
                 ? this.decisionResult.confidence * 100
                 : 0;
             document.getElementById('confidenceValue').textContent = `${confidence.toFixed(1)}%`;
             document.getElementById('confidenceBar').style.width = `${confidence}%`;
+
+            // Show warning if fallback
+            if (isFallback) {
+                console.warn('⚠️ ML prediction used MCDM fallback - confidence may be 100%');
+            }
         } else {
             // MCDM mode
             decisionMethod.textContent = 'MATH CALCULATED';
-
-            // Show cost, hide confidence
             confidenceMetric.style.display = 'none';
             costMetric.style.display = 'block';
+            decisionMetricHeader.innerHTML = 'Cost<br><small>(score)</small>';
 
             const cost = this.decisionResult.cost !== null ? this.decisionResult.cost : 0;
             document.getElementById('costValue').textContent = cost.toFixed(2);
-            // Normalize cost to 0-100 for progress bar (assume max cost = 50)
             const costPercent = Math.min(100, (cost / 50) * 100);
             document.getElementById('costBar').style.width = `${costPercent}%`;
         }
 
-        // Update cost comparison if available (MCDM only)
-        const costComparison = document.getElementById('costComparison');
-        if (this.decisionResult.allCosts) {
-            const sortedCosts = Object.entries(this.decisionResult.allCosts)
-                .sort((a, b) => a[1] - b[1]);
+        // Populate comprehensive network table
+        this.populateNetworkTable(isAIMode);
+    }
 
-            costComparison.innerHTML = sortedCosts.map(([network, cost]) => {
-                const isWinner = network === this.decisionResult.selectedNetwork;
-                return `
-                    <div class="cost-item ${isWinner ? 'winner' : ''}">
-                        <span>${network}</span>
-                        <span>${cost.toFixed(2)}</span>
-                    </div>
-                `;
-            }).join('');
-        } else {
-            // Clear cost comparison for ML mode
-            costComparison.innerHTML = `<div style="text-align: center; color: rgba(255,255,255,0.5); padding: 10px; font-size: 12px;">Method: ${this.decisionResult.method || 'ML'}</div>`;
+    populateNetworkTable(isAIMode) {
+        const tableBody = document.getElementById('networksTableBody');
+
+        if (!this.availableNetworks || this.availableNetworks.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="7" class="no-data">No networks available</td></tr>';
+            return;
+        }
+
+        const selectedStationId = this.decisionResult.selectedNetwork; // Now contains station_id
+
+        // Build rows for each network
+        const rows = this.availableNetworks.map(network => {
+            const isSelected = network.station_id === selectedStationId;
+            const rowClass = isSelected ? 'selected-row' : '';            // Get network type badge
+            const badgeClass = `badge-${network.name.toLowerCase().replace('-', '')}`;
+
+            // Format values with fallbacks
+            const bandwidth = network.bandwidth !== undefined ? network.bandwidth.toFixed(1) : '-';
+            const latency = network.latency !== undefined ? network.latency : '-';
+            const rssi = network.rssi !== undefined ? network.rssi.toFixed(1) : '-';
+            const snr = network.snr !== undefined ? network.snr.toFixed(1) : '-';
+            const plr = network.packet_loss_rate !== undefined
+                ? (network.packet_loss_rate * 100).toFixed(2)
+                : '-';
+
+            // Get cost or confidence for this network
+            let decisionMetric = '-';
+            let decisionBar = '';
+
+            if (isAIMode) {
+                // For AI mode: show confidence for selected, estimated cost for others
+                if (isSelected && this.decisionResult.confidence !== null) {
+                    const conf = (this.decisionResult.confidence * 100).toFixed(1);
+                    decisionMetric = conf;
+                    decisionBar = `<div class="confidence-bar-mini"><div class="confidence-fill-mini" style="width: ${conf}%"></div></div>`;
+                } else {
+                    // Calculate estimated cost for non-selected networks
+                    const estimatedCost = this.calculateEstimatedCost(network);
+                    if (estimatedCost !== null) {
+                        decisionMetric = `~${estimatedCost.toFixed(2)}`;
+                        const costPercent = Math.min(100, (estimatedCost / 50) * 100);
+                        decisionBar = `<div class="confidence-bar-mini"><div class="confidence-fill-mini" style="width: ${costPercent}%; opacity: 0.5;"></div></div>`;
+                    }
+                }
+            } else {
+                // For MCDM mode, show cost for all networks if available
+                if (this.decisionResult.allCosts && this.decisionResult.allCosts[network.name]) {
+                    const cost = this.decisionResult.allCosts[network.name];
+                    decisionMetric = cost.toFixed(2);
+                    const costPercent = Math.min(100, (cost / 50) * 100);
+                    decisionBar = `<div class="confidence-bar-mini"><div class="confidence-fill-mini" style="width: ${costPercent}%"></div></div>`;
+                } else if (isSelected && this.decisionResult.cost !== null) {
+                    decisionMetric = this.decisionResult.cost.toFixed(2);
+                }
+            }
+
+            return `
+                <tr class="${rowClass}">
+                    <td>
+                        <span class="network-type-badge ${badgeClass}">${network.station_id || network.name}</span>
+                    </td>
+                    <td class="metric-value-cell">${bandwidth}</td>
+                    <td class="metric-value-cell">${latency}</td>
+                    <td class="metric-value-cell">${rssi}</td>
+                    <td class="metric-value-cell">${snr}</td>
+                    <td class="metric-value-cell">${plr}</td>
+                    <td class="metric-value-cell">
+                        ${decisionMetric}
+                        ${decisionBar}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        tableBody.innerHTML = rows;
+    }
+
+    calculateEstimatedCost(network) {
+        /**
+         * Calculate estimated cost for a network based on QoS metrics.
+         * This is a simplified approximation of the MCDM cost function.
+         * 
+         * Cost = w_energy * Energy_Cost + w_latency * Latency_Penalty + w_bandwidth * BW_Penalty
+         */
+        try {
+            // Weights (approximate, actual weights in backend may differ)
+            const w_energy = 0.5;
+            const w_latency = 0.3;
+            const w_bandwidth = 0.2;
+
+            // Energy cost estimation (based on network type)
+            const energyCostMap = {
+                'Wi-Fi': 15,
+                '5G': 25,
+                'BLE': 5,
+                '4G': 20
+            };
+            const energyCost = energyCostMap[network.name] || 20;
+
+            // Latency penalty (higher is worse)
+            const latency = network.latency || 50;
+            const latencyPenalty = latency / 10; // Normalize
+
+            // Bandwidth penalty (lower is worse)
+            const bandwidth = network.bandwidth || 1;
+            const bandwidthPenalty = 100 / bandwidth; // Inverse
+
+            // Calculate total cost
+            const totalCost = (w_energy * energyCost) +
+                (w_latency * latencyPenalty) +
+                (w_bandwidth * bandwidthPenalty);
+
+            return totalCost;
+        } catch (error) {
+            console.error('Error calculating estimated cost:', error);
+            return null;
         }
     }
 
@@ -935,7 +1104,15 @@ class MapVisualization {
             this.ctx.fillStyle = '#666';
             this.ctx.font = 'bold 9px Arial';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(`${minDistance.toFixed(0)}m • Cost: ${this.decisionResult.cost.toFixed(2)}`, midX, boxY + boxHeight - 8);
+
+            // Show cost only for MCDM mode, confidence for AI mode
+            if (this.decisionResult.cost !== null) {
+                this.ctx.fillText(`${minDistance.toFixed(0)}m • Cost: ${this.decisionResult.cost.toFixed(2)}`, midX, boxY + boxHeight - 8);
+            } else if (this.decisionResult.confidence !== null) {
+                this.ctx.fillText(`${minDistance.toFixed(0)}m • AI Confidence: ${(this.decisionResult.confidence * 100).toFixed(1)}%`, midX, boxY + boxHeight - 8);
+            } else {
+                this.ctx.fillText(`${minDistance.toFixed(0)}m`, midX, boxY + boxHeight - 8);
+            }
         } else {
             this.ctx.fillStyle = '#666';
             this.ctx.font = '10px Arial';

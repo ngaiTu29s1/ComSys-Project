@@ -4,6 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>IoT Network Selection - AI Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -389,6 +392,8 @@
             cursor: pointer;
             transition: background 0.3s;
             border: 2px solid rgba(255, 255, 255, 0.2);
+            pointer-events: auto;
+            user-select: none;
         }
 
         .toggle-switch.active {
@@ -411,6 +416,7 @@
             border-radius: 50%;
             transition: transform 0.3s;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
         }
 
         .toggle-switch.active .toggle-knob {
@@ -647,6 +653,116 @@
             border-color: rgba(156, 39, 176, 0.4);
         }
 
+        /* Network Metrics Table */
+        .networks-table {
+            width: 100%;
+            margin-top: 16px;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .networks-table th {
+            background: rgba(0, 0, 0, 0.4);
+            color: rgba(255, 255, 255, 0.8);
+            padding: 8px 6px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .networks-table td {
+            padding: 10px 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .networks-table tr {
+            transition: background 0.2s ease;
+        }
+
+        .networks-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .networks-table tr.selected-row {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 3px solid #4CAF50;
+            font-weight: 600;
+        }
+
+        body.ai-mode .networks-table tr.selected-row {
+            background: rgba(156, 39, 176, 0.25);
+            border-left-color: #9C27B0;
+        }
+
+        body.mcdm-mode .networks-table tr.selected-row {
+            background: rgba(33, 150, 243, 0.25);
+            border-left-color: #2196F3;
+        }
+
+        .network-type-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .badge-wifi {
+            background: #2196F3;
+            color: white;
+        }
+
+        .badge-5g {
+            background: #9C27B0;
+            color: white;
+        }
+
+        .badge-ble {
+            background: #FF9800;
+            color: white;
+        }
+
+        .badge-4g {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .metric-value-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+        }
+
+        .confidence-bar-mini {
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .confidence-fill-mini {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #66BB6A);
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        body.ai-mode .confidence-fill-mini {
+            background: linear-gradient(90deg, #9C27B0, #E91E63);
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-style: italic;
+        }
+
         #decisionResult {
             display: none;
         }
@@ -657,13 +773,13 @@
     </style>
 </head>
 
-<body class="mcdm-mode">
+<body class="ai-mode">
     <div class="container">
         <!-- Map Visualization Area -->
         <div class="map-container">
             <div class="map-header">
                 <div class="map-title">🗺️ IoT Network Map</div>
-                <span class="mode-indicator" id="modeIndicator">MCDM MODE</span>
+                <span class="mode-indicator" id="modeIndicator">AI MODE</span>
             </div>
             <div class="canvas-wrapper">
                 <canvas id="mapCanvas" width="800" height="600" class="map-canvas"></canvas>
@@ -752,9 +868,9 @@
                 </select>
             </div>
 
-            <!-- Metrics Dashboard -->
+            <!-- Network Metrics Dashboard -->
             <div class="control-section metrics-dashboard" id="decisionResult">
-                <h3>📊 Decision Metrics</h3>
+                <h3>📊 Network Metrics & Decision</h3>
 
                 <div class="selected-network-display">
                     <div class="network-label" id="decisionMethod">AI SELECTED</div>
@@ -781,11 +897,42 @@
                     </div>
                 </div>
 
-                <div class="cost-comparison" id="costComparison"></div>
+                <!-- Comprehensive Network Comparison Table -->
+                <div style="margin-top: 16px; overflow-x: auto;">
+                    <table class="networks-table" id="networksTable">
+                        <thead>
+                            <tr>
+                                <th>Network</th>
+                                <th>BW<br><small>(Mbps)</small></th>
+                                <th>Lat<br><small>(ms)</small></th>
+                                <th>RSSI<br><small>(dBm)</small></th>
+                                <th>SNR<br><small>(dB)</small></th>
+                                <th>PLR<br><small>(%)</small></th>
+                                <th id="decisionMetricHeader">Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody id="networksTableBody">
+                            <tr>
+                                <td colspan="7" class="no-data">Run a decision to see metrics</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
+    <script>
+        // Force initial state before main script loads
+        console.log('🔧 Pre-init check - Body class:', document.body.className);
+        console.log('🔧 Pre-init check - Origin:', window.location.origin);
+
+        // Ensure body has ai-mode class (matching toggle default)
+        if (!document.body.classList.contains('ai-mode')) {
+            console.warn('⚠️ Body missing ai-mode class, adding it now');
+            document.body.classList.add('ai-mode');
+        }
+    </script>
     <script src="/static/map-visualization.js"></script>
 </body>
 
