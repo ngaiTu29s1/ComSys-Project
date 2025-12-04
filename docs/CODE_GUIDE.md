@@ -1,12 +1,42 @@
 # Hướng Dẫn Code Chi Tiết - Hệ Thống Lựa Chọn Mạng IoT
 
-> **Dành cho:** Người mới bắt đầu tìm hiểu codebase
+> **Dành cho:** Developers, Researchers, Contributors
 > 
-> **Mục đích:** Giải thích chi tiết từng file, từng hàm, từng chức năng trong dự án
+> **Mục đích:** Giải thích chi tiết cấu trúc code, API, workflows, và cách mở rộng
 > 
-> **Trạng thái:** ML-Integrated - Random Forest Model hoạt động (99.5% accuracy)
+> **Status Stack:** Python 3.11 | FastAPI | Random Forest (99.5% accuracy) | Dark UI
 > 
-> **Cập nhật:** December 4, 2025 (ML Integration Complete)
+> **Cập nhật:** December 4, 2025 (Metrics & Cost Unification Complete)
+> 
+> **Liên Quan:** Xem [`RESEARCH_REPORT.md`](RESEARCH_REPORT.md) cho chi tiết toán học
+
+---
+
+## 🚀 THAY ĐỔI GẦN ĐÂY (Latest Updates)
+
+### December 4, 2025 - Metrics & Cost Unification
+
+✅ **Backend Changes:**
+- `/simulation/step`: Trả về đầy đủ QoS metrics (`rssi`, `snr`, `packet_loss_rate`)
+- `/decision`: Dùng `station_id` làm key cho `all_network_costs` (không phải network type)
+- `/decision/ml`: Bổ sung `all_network_costs` dict + `cost` field
+
+✅ **Frontend Changes:**
+- Hiển thị **Confidence %** cho AI mode (selected network only)
+- Hiển thị **Cost score** cho tất cả networks (MCDM calculation)
+- Table metrics đầy đủ: BW, Lat, RSSI, SNR, PLR, Cost
+- Station ID labels: `WiFi-4`, `5G-2`, `BLE-3` (không phải chỉ loại mạng)
+
+✅ **Physics Model:**
+- Increased k=1.0 (steeper PLR curve, realistic values)
+- Reduced shadowing sigma (less noise): Wi-Fi 2.0, 5G 2.5, BLE 1.5
+- Hard limits: SNR > 30dB → PLR ≤ 0.1%
+
+✅ **Data & Scripts:**
+- Removed from `.gitignore` (needed for reproducibility)
+- `data/raw/training_data.csv` now tracked
+- `models/rf_network_selector.pkl` now tracked
+- `scripts/*.py` tools now tracked
 
 ---
 
@@ -935,15 +965,15 @@ def simulation_step():
 }
 ```
 
-#### 📍 `POST /decision` - Make Decision
+#### 📍 `POST /decision` - MCDM Decision
 
 ```python
 @app.post("/decision")
 def make_decision(device_state: DeviceState):
-    """Ra quyết định chọn mạng tối ưu."""
+    """Ra quyết định lựa chọn mạng bằng MCDM algorithm."""
 ```
 
-**Chức năng:** Gọi `select_best_network()` từ decision_logic.
+**Chức năng:** Tính cost cho TẤT CẢ networks và chọn network có cost thấp nhất.
 
 **Request Body:**
 ```json
@@ -951,6 +981,119 @@ def make_decision(device_state: DeviceState):
   "position": [150, 200],
   "current_task": "DATA_BURST_ALERT",
   "available_networks": [
+    {
+      "name": "Wi-Fi",
+      "station_id": "WiFi-4",
+      "bandwidth": 85.3,
+      "latency": 12,
+      "is_available": true,
+      "rssi": -68.4,
+      "snr": 26.6,
+      "packet_loss_rate": 0.02
+    },
+    {
+      "name": "5G",
+      "station_id": "5G-3",
+      "bandwidth": 95.2,
+      "latency": 18,
+      "is_available": true,
+      "rssi": -72.1,
+      "snr": 22.8,
+      "packet_loss_rate": 0.05
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "optimal_network": "Wi-Fi",
+  "optimal_cost": 12.45,
+  "all_network_costs": {
+    "WiFi-4": 12.45,
+    "5G-3": 18.92
+  },
+  "device_info": {
+    "position": [150, 200],
+    "current_task": "DATA_BURST_ALERT"
+  },
+  "cost_analysis": {
+    "WiFi-4": {
+      "total_cost": 12.45,
+      "network_info": {...},
+      "config_info": {...}
+    },
+    "5G-3": {...}
+  }
+}
+```
+
+**Logic:**
+1. Lặp qua `available_networks`
+2. Với mỗi network, tính: `Cost = w_energy * E_total + w_qos * P_qos`
+3. Chọn network có min cost
+4. Return optimal_network + all_network_costs (để frontend so sánh)
+
+**Key Updates:**
+- ✅ `all_network_costs` dùng `station_id` làm key (không phải network type)
+- ✅ `station_id` cho phép phân biệt giữa các stations cùng loại mạng
+
+---
+
+#### 📍 `POST /decision/ml` - ML Decision (NEW!)
+
+```python
+@app.post("/decision/ml")
+def make_decision_ml(device_state: DeviceState):
+    """Ra quyết định bằng ML (Random Forest) với fallback về MCDM."""
+```
+
+**Chức năng:** Dự đoán mạng bằng ML model, automatically calculate cost cho tất cả networks.
+
+**Request Body:** Giống `/decision`
+
+**Response:**
+```json
+{
+  "selected_network": "5G",
+  "station_id": "5G-3",
+  "method": "ML",
+  "confidence": 0.96,
+  "cost": 18.92,
+  "all_network_costs": {
+    "WiFi-4": 12.45,
+    "5G-3": 18.92
+  },
+  "device_info": {
+    "position": [150, 200],
+    "current_task": "DATA_BURST_ALERT"
+  },
+  "network_details": {
+    "name": "5G",
+    "bandwidth": 95.2,
+    "latency": 18,
+    "snr": 22.8,
+    "rssi": -72.1
+  }
+}
+```
+
+**Logic:**
+1. Dùng `ml_predictor.predict()` để lấy predicted network + confidence
+2. Trích xuất `station_id` của predicted network
+3. **Tính MCDM cost cho TẤT CẢ networks** (giống `/decision`)
+4. Lấy cost của selected network
+5. Return `method="ML"` + confidence + cost + all_network_costs
+
+**Fallback Mechanism:**
+- Nếu ML model không khả dụng → `method="MCDM_Fallback"`, `confidence=1.0`
+- Nếu predicted network không có trong available_networks → fallback đến MCDM
+
+**Key Difference vs `/decision`:**
+- `/decision`: Pure MCDM, `method="MCDM"`
+- `/decision/ml`: ML-based, `method="ML"` hoặc `method="MCDM_Fallback"`
+- Cả hai return `all_network_costs` để frontend có tất cả options
 ### 6. `web/map-visualization.js`
 
 **Mục đích:** JavaScript logic cho giao diện map visualization với Canvas API.
@@ -1405,16 +1548,27 @@ predictor = MLPredictor("models/rf_network_selector.pkl")
 # Tự động load cả feature_engineer
 ```
 
-#### 📍 Method `predict(device_state, available_networks, engine)`
+#### 📍 Method `predict(device_state, available_networks, engine)` - **MAIN METHOD**
+
+**Chức năng:** Dự đoán mạng tối ưu bằng ML model.
 
 **Workflow:**
-1. Extract 18 features từ `device_state`
-2. Transform features (qua FeatureEngineer)
-3. Model predict → network type (0/1/2)
-4. Map network type → NetworkState object
-5. Return `(best_network, confidence)`
+1. **Extract 18 features** từ device_state, available_networks
+2. **Standardize features** (StandardScaler transform)
+3. **Model predict** → class label (0=Wi-Fi, 1=5G, 2=BLE)
+4. **Get confidence** → `model.predict_proba()` → max probability
+5. **Map result** → NetworkState object của predicted network
+6. **Return tuple**: `(best_network_state, confidence_score)`
 
-**Ví dụ:**
+**Key Detail - Confidence Calculation:**
+```python
+# Dùng predict_proba để lấy xác suất
+probabilities = model.predict_proba(X)[0]  # e.g., [0.96, 0.03, 0.01]
+prediction = model.predict(X)[0]           # e.g., 0 (Wi-Fi)
+confidence = float(probabilities[prediction])  # e.g., 0.96
+```
+
+**Ví dụ đầy đủ:**
 ```python
 device_state = DeviceState(
     position=(150, 200),
@@ -1432,6 +1586,14 @@ best_network, confidence = predictor.predict(
 # best_network = wifi_state (NetworkState object)
 # confidence = 0.96 (96% chắc chắn)
 ```
+
+**Output Format:**
+- `best_network`: NetworkState object (có tất cả QoS metrics)
+- `confidence`: float trong range [0.0, 1.0]
+
+**Sai Số:**
+- Nếu model không khả dụng → `return (None, 0.0)`
+- Nếu device không có networks → `return (None, 0.0)`
 
 #### 📍 Method `predict_with_probabilities()`
 
