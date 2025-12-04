@@ -42,11 +42,10 @@ conda-meta/
 *.ipynb_checkpoints
 jupyter_notebook_config.py
 
-# === Data & Models (generated) ===
-data/raw/*.csv
+# === Data & Models (keep for reproducibility) ===
+# Keep training data and trained models in repo
+# Ignore only generated/processed outputs
 data/processed/*.csv
-models/*.pkl
-models/*.joblib
 *.parquet
 
 # Keep directory structure
@@ -82,5 +81,3 @@ dist/
 *.egg-info/
 
 .github
-
-scripts/
