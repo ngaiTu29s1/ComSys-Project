@@ -43,11 +43,15 @@ conda-meta/
 jupyter_notebook_config.py
 
 # === Data & Models (generated) ===
-data/
-*.csv
+data/raw/*.csv
+data/processed/*.csv
+models/*.pkl
+models/*.joblib
 *.parquet
-*.joblib
-*.pkl
+
+# Keep directory structure
+!data/.gitkeep
+!models/.gitkeep
 *.h5
 
 # === Logs / Outputs ===
