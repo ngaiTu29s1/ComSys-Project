@@ -46,6 +46,7 @@ class MapVisualization {
         this.baseStations = [];
         this.decisionResult = null;
         this.connectedStation = null; // Track which specific station device is connected to
+        this.animationFrameId = null; // Store animation frame ID
 
         // Colors for different networks
         this.networkColors = {
@@ -94,7 +95,19 @@ class MapVisualization {
             useAIToggle.classList.toggle('active');
             const isAI = useAIToggle.classList.contains('active');
             console.log('AI mode:', isAI ? 'ENABLED' : 'DISABLED');
-            this.updateStatusBar(isAI ? '🤖 AI/ML Mode enabled' : '📐 MCDM Mode enabled');
+
+            // Toggle body class for theme change
+            if (isAI) {
+                document.body.classList.remove('mcdm-mode');
+                document.body.classList.add('ai-mode');
+                document.getElementById('modeIndicator').textContent = 'AI MODE';
+                this.updateStatusBar('🤖 AI/ML Mode enabled');
+            } else {
+                document.body.classList.remove('ai-mode');
+                document.body.classList.add('mcdm-mode');
+                document.getElementById('modeIndicator').textContent = 'MCDM MODE';
+                this.updateStatusBar('📐 MCDM Mode enabled');
+            }
         });
 
         // Canvas click for manual device placement
@@ -508,29 +521,46 @@ class MapVisualization {
         const decisionElement = document.getElementById('decisionResult');
 
         if (!this.decisionResult) {
-            decisionElement.style.display = 'none';
+            decisionElement.classList.remove('visible');
             return;
         }
 
-        decisionElement.style.display = 'block';
+        decisionElement.classList.add('visible');
 
-        // Update selected network
+        // Update selected network name
         document.getElementById('selectedNetwork').textContent = this.decisionResult.selectedNetwork;
 
-        // Update cost/confidence display based on method
-        const costElement = document.getElementById('selectedCost');
+        // Update decision method label
+        const decisionMethod = document.getElementById('decisionMethod');
+        const confidenceMetric = document.getElementById('confidenceMetric');
+        const costMetric = document.getElementById('costMetric');
+
         if (this.decisionResult.method === 'ML' || this.decisionResult.method === 'MCDM_Fallback') {
-            // AI/ML mode - show confidence
-            costElement.textContent = this.decisionResult.confidence !== null
-                ? `${(this.decisionResult.confidence * 100).toFixed(1)}%`
-                : 'N/A';
-            costElement.parentElement.querySelector('strong').textContent = 'Confidence:';
+            // AI/ML mode
+            decisionMethod.textContent = 'AI SELECTED';
+
+            // Show confidence, hide cost
+            confidenceMetric.style.display = 'block';
+            costMetric.style.display = 'none';
+
+            const confidence = this.decisionResult.confidence !== null
+                ? this.decisionResult.confidence * 100
+                : 0;
+            document.getElementById('confidenceValue').textContent = `${confidence.toFixed(1)}%`;
+            document.getElementById('confidenceBar').style.width = `${confidence}%`;
         } else {
-            // MCDM mode - show cost
-            costElement.textContent = this.decisionResult.cost !== null
-                ? this.decisionResult.cost.toFixed(2)
-                : 'N/A';
-            costElement.parentElement.querySelector('strong').textContent = 'Cost:';
+            // MCDM mode
+            decisionMethod.textContent = 'MATH CALCULATED';
+
+            // Show cost, hide confidence
+            confidenceMetric.style.display = 'none';
+            costMetric.style.display = 'block';
+
+            const cost = this.decisionResult.cost !== null ? this.decisionResult.cost : 0;
+            document.getElementById('costValue').textContent = cost.toFixed(2);
+            // Normalize cost to 0-100 for progress bar (assume max cost = 50)
+            const costPercent = Math.min(100, (cost / 50) * 100);
+            document.getElementById('costBar').style.width = `${costPercent}%`;
         }
 
         // Update cost comparison if available (MCDM only)
@@ -550,7 +580,7 @@ class MapVisualization {
             }).join('');
         } else {
             // Clear cost comparison for ML mode
-            costComparison.innerHTML = `<div style="text-align: center; color: #999; padding: 10px;">Method: ${this.decisionResult.method || 'ML'}</div>`;
+            costComparison.innerHTML = `<div style="text-align: center; color: rgba(255,255,255,0.5); padding: 10px; font-size: 12px;">Method: ${this.decisionResult.method || 'ML'}</div>`;
         }
     }
 
@@ -600,10 +630,28 @@ class MapVisualization {
     }
 
     drawBaseStations() {
+        const time = Date.now() / 1000;
+
         this.baseStations.forEach(station => {
             const x = station.x * this.scale.x;
             const y = station.y * this.scale.y;
             const radius = 10;
+
+            // Check if this station is connected
+            const isConnected = this.connectedStation && this.connectedStation === station.id;
+
+            // Draw glow effect for connected station
+            if (isConnected) {
+                const glowRadius = radius + 8 + Math.sin(time * 3) * 3;
+                this.ctx.shadowColor = this.networkColors[station.type];
+                this.ctx.shadowBlur = 20;
+                this.ctx.strokeStyle = this.networkColors[station.type];
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, glowRadius, 0, 2 * Math.PI);
+                this.ctx.stroke();
+                this.ctx.shadowBlur = 0;
+            }
 
             // Draw station circle
             this.ctx.fillStyle = this.networkColors[station.type] || '#666';
@@ -611,9 +659,9 @@ class MapVisualization {
             this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
             this.ctx.fill();
 
-            // Draw station border
-            this.ctx.strokeStyle = 'white';
-            this.ctx.lineWidth = 2;
+            // Draw station border (brighter if connected)
+            this.ctx.strokeStyle = isConnected ? '#FFD700' : 'white';
+            this.ctx.lineWidth = isConnected ? 3 : 2;
             this.ctx.stroke();
 
             // Draw antenna icon in center
@@ -627,7 +675,7 @@ class MapVisualization {
             const label = station.id || station.type;
             const labelWidth = this.ctx.measureText(label).width + 8;
 
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            this.ctx.fillStyle = isConnected ? 'rgba(255, 215, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)';
             this.ctx.fillRect(x - labelWidth / 2, y + 14, labelWidth, 14);
 
             this.ctx.strokeStyle = this.networkColors[station.type];
@@ -684,14 +732,26 @@ class MapVisualization {
         const y = this.devicePosition.y * this.scale.y;
         const radius = 14;
 
-        // Draw pulsing ring for better visibility
-        this.ctx.strokeStyle = 'rgba(255, 68, 68, 0.4)';
-        this.ctx.lineWidth = 4;
+        // Draw animated pulse effect (expanding circles)
+        const time = Date.now() / 1000;
+        const pulseRadius1 = radius + 10 + Math.sin(time * 2) * 5;
+        const pulseRadius2 = radius + 20 + Math.sin(time * 2 + Math.PI) * 5;
+
+        this.ctx.strokeStyle = 'rgba(255, 68, 68, 0.3)';
+        this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.arc(x, y, radius + 6, 0, 2 * Math.PI);
+        this.ctx.arc(x, y, pulseRadius1, 0, 2 * Math.PI);
         this.ctx.stroke();
 
-        // Draw device circle
+        this.ctx.strokeStyle = 'rgba(255, 68, 68, 0.15)';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, pulseRadius2, 0, 2 * Math.PI);
+        this.ctx.stroke();
+
+        // Draw device circle with glow
+        this.ctx.shadowColor = '#FF4444';
+        this.ctx.shadowBlur = 15;
         this.ctx.fillStyle = '#FF4444';
         this.ctx.strokeStyle = 'white';
         this.ctx.lineWidth = 3;
@@ -699,6 +759,7 @@ class MapVisualization {
         this.ctx.arc(x, y, radius, 0, 2 * Math.PI);
         this.ctx.fill();
         this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
 
         // Draw center dot for precise position
         this.ctx.fillStyle = 'white';
@@ -743,6 +804,11 @@ class MapVisualization {
         this.ctx.textBaseline = 'middle';
         this.ctx.fillText(taskLabels[this.currentTask] || '?', badgeX, badgeY);
 
+        // Request animation frame for continuous pulse effect
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+        }
+        this.animationFrameId = requestAnimationFrame(() => this.draw());
         // Position label
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         this.ctx.fillRect(x - 35, y + 25, 70, 16);

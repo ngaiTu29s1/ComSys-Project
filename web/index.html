@@ -4,7 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IoT Network Selection Map Visualization</title>
+    <title>IoT Network Selection - AI Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -13,28 +16,39 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: #0f0f1e;
             min-height: 100vh;
             padding: 20px;
+            color: #e0e0e0;
+            transition: background 0.5s ease;
+        }
+
+        body.ai-mode {
+            background: linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 100%);
+        }
+
+        body.mcdm-mode {
+            background: linear-gradient(135deg, #0a1a2e 0%, #1b2d4e 100%);
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: 1fr 350px;
-            gap: 20px;
+            grid-template-columns: 1fr 420px;
+            gap: 24px;
             height: calc(100vh - 40px);
         }
 
         .map-container {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            background: #16213e;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             display: flex;
             flex-direction: column;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .map-header {
@@ -42,25 +56,55 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 16px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
         }
 
         .map-title {
-            color: #333;
+            color: #fff;
             font-size: 24px;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .mode-indicator {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+
+        body.ai-mode .mode-indicator {
+            background: linear-gradient(135deg, #9C27B0, #E91E63);
+            color: white;
+            box-shadow: 0 0 20px rgba(156, 39, 176, 0.5);
+        }
+
+        body.mcdm-mode .mode-indicator {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: white;
+            box-shadow: 0 0 20px rgba(33, 150, 243, 0.5);
         }
 
         .map-canvas {
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            background: #f8f9fa;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            background: #0d1929;
             display: block;
             max-width: 100%;
             max-height: 100%;
             width: auto;
             height: auto;
+            box-shadow: 0 0 40px rgba(100, 200, 255, 0.15);
+            transition: box-shadow 0.3s ease;
+        }
+
+        body.ai-mode .map-canvas {
+            box-shadow: 0 0 40px rgba(200, 100, 255, 0.25);
         }
 
         .canvas-wrapper {
@@ -72,55 +116,81 @@
         }
 
         .control-panel {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            background: #16213e;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             display: flex;
             flex-direction: column;
             gap: 20px;
             max-height: calc(100vh - 40px);
             overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .control-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .control-panel::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+        }
+
+        .control-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
         }
 
         .control-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .control-section h3 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 16px;
+            color: #fff;
+            margin-bottom: 14px;
+            font-size: 15px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .device-info {
-            background: linear-gradient(135deg, #4CAF50, #45a049);
+            background: linear-gradient(135deg, #4CAF50, #388E3C);
             color: white;
-            border-radius: 8px;
-            padding: 15px;
+            padding: 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+            border: none;
         }
 
         .device-info h3 {
+            margin-bottom: 12px;
+            font-size: 15px;
             color: white;
-            margin-bottom: 10px;
         }
 
         .info-item {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
         }
 
         .info-label {
             font-weight: 500;
+            opacity: 0.9;
         }
 
         .info-value {
-            font-weight: 600;
+            font-weight: 700;
             font-family: 'Courier New', monospace;
         }
 
@@ -205,41 +275,66 @@
         }
 
         .btn {
-            padding: 12px 20px;
+            padding: 14px 20px;
             border: none;
-            border-radius: 6px;
+            border-radius: 10px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
             font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
         }
 
         .btn-primary {
-            background: #2196F3;
+            background: linear-gradient(135deg, #2196F3, #1976D2);
             color: white;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
         }
 
         .btn-primary:hover {
-            background: #1976D2;
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.6);
         }
 
         .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
+            background: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .btn-secondary:hover {
-            background: #e0e0e0;
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .btn-success {
-            background: #4CAF50;
+            background: linear-gradient(135deg, #4CAF50, #388E3C);
             color: white;
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
         }
 
         .btn-success:hover {
-            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
         }
 
         .legend {
@@ -275,53 +370,114 @@
         .animation-toggle {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .animation-toggle span {
+            font-weight: 500;
+            color: #e0e0e0;
         }
 
         .toggle-switch {
             position: relative;
-            width: 50px;
-            height: 25px;
-            background: #ccc;
-            border-radius: 25px;
+            width: 54px;
+            height: 28px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 28px;
             cursor: pointer;
             transition: background 0.3s;
+            border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
         .toggle-switch.active {
-            background: #4CAF50;
+            background: linear-gradient(135deg, #4CAF50, #388E3C);
+            border-color: #4CAF50;
+        }
+
+        body.ai-mode .toggle-switch.active {
+            background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+            border-color: #9C27B0;
         }
 
         .toggle-knob {
             position: absolute;
             top: 2px;
             left: 2px;
-            width: 21px;
-            height: 21px;
+            width: 20px;
+            height: 20px;
             background: white;
             border-radius: 50%;
             transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .toggle-switch.active .toggle-knob {
-            transform: translateX(25px);
+            transform: translateX(26px);
+        }
+
+        .ai-toggle-section {
+            margin-bottom: 18px;
+            padding: 14px;
+            background: rgba(156, 39, 176, 0.15);
+            border-radius: 10px;
+            border: 2px solid rgba(156, 39, 176, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        body.ai-mode .ai-toggle-section {
+            background: rgba(156, 39, 176, 0.25);
+            border-color: rgba(156, 39, 176, 0.5);
+            box-shadow: 0 0 20px rgba(156, 39, 176, 0.3);
+        }
+
+        body.mcdm-mode .ai-toggle-section {
+            background: rgba(33, 150, 243, 0.15);
+            border-color: rgba(33, 150, 243, 0.3);
+        }
+
+        .ai-toggle-section small {
+            display: block;
+            margin-top: 6px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            line-height: 1.4;
         }
 
         @keyframes pulse {
-            0% {
+
+            0%,
+            100% {
                 transform: scale(1);
                 opacity: 1;
             }
 
             50% {
-                transform: scale(1.2);
+                transform: scale(1.15);
                 opacity: 0.7;
+            }
+        }
+
+        @keyframes glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 20px rgba(100, 200, 255, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 40px rgba(100, 200, 255, 0.6);
+            }
+        }
+
+        @keyframes shimmer {
+            0% {
+                transform: translateX(-100%);
             }
 
             100% {
-                transform: scale(1);
-                opacity: 1;
+                transform: translateX(100%);
             }
         }
 
@@ -329,72 +485,209 @@
             animation: pulse 2s infinite;
         }
 
-        .decision-result {
-            background: linear-gradient(135deg, #FF6B6B, #FF8E53);
-            color: white;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
+        .metrics-dashboard {
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.1), rgba(33, 150, 243, 0.1));
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .decision-result h4 {
-            margin-bottom: 10px;
-            color: white;
+        body.ai-mode .metrics-dashboard {
+            background: linear-gradient(135deg, rgba(156, 39, 176, 0.2), rgba(233, 30, 99, 0.2));
+            border-color: rgba(156, 39, 176, 0.3);
+        }
+
+        body.mcdm-mode .metrics-dashboard {
+            background: linear-gradient(135deg, rgba(33, 150, 243, 0.2), rgba(25, 118, 210, 0.2));
+            border-color: rgba(33, 150, 243, 0.3);
+        }
+
+        .metrics-dashboard h3 {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 18px;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .selected-network-display {
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-bottom: 16px;
+        }
+
+        .network-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 8px;
+        }
+
+        .network-name {
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 0 20px currentColor;
+        }
+
+        body.ai-mode .network-name {
+            background: linear-gradient(135deg, #9C27B0, #E91E63);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        body.mcdm-mode .network-name {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .metric-item {
+            margin-bottom: 16px;
+        }
+
+        .metric-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            color: #4CAF50;
+            font-weight: 700;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #66BB6A);
+            border-radius: 8px;
+            transition: width 0.6s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body.ai-mode .progress-fill {
+            background: linear-gradient(90deg, #9C27B0, #E91E63);
+        }
+
+        body.mcdm-mode .progress-fill {
+            background: linear-gradient(90deg, #2196F3, #42A5F5);
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(255, 255, 255, 0.3),
+                    transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        .status-bar {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Courier New', monospace;
         }
 
         .cost-comparison {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            margin-top: 10px;
+            margin-top: 12px;
         }
 
         .cost-item {
             display: flex;
             justify-content: space-between;
-            font-size: 12px;
-            padding: 4px 8px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+
+        .cost-item:hover {
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .cost-item.winner {
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid rgba(76, 175, 80, 0.4);
             font-weight: 600;
+        }
+
+        body.ai-mode .cost-item.winner {
+            background: rgba(156, 39, 176, 0.2);
+            border-color: rgba(156, 39, 176, 0.4);
+        }
+
+        #decisionResult {
+            display: none;
+        }
+
+        #decisionResult.visible {
+            display: block;
         }
     </style>
 </head>
 
-<body>
+<body class="mcdm-mode">
     <div class="container">
-        <!-- Map Visualization -->
+        <!-- Map Visualization Area -->
         <div class="map-container">
             <div class="map-header">
-                <h2 class="map-title">🗺️ IoT Network Selection Map</h2>
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-icon" style="background: #FF4444;"></div>
-                        <span>IoT Device</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-icon" style="background: #2196F3;"></div>
-                        <span>Wi-Fi Station</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-icon" style="background: #9C27B0;"></div>
-                        <span>5G Station</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-icon" style="background: #FF9800;"></div>
-                        <span>BLE Station</span>
-                    </div>
-                </div>
+                <div class="map-title">🗺️ IoT Network Map</div>
+                <span class="mode-indicator" id="modeIndicator">MCDM MODE</span>
             </div>
             <div class="canvas-wrapper">
-                <canvas id="mapCanvas" class="map-canvas" width="800" height="600"></canvas>
+                <canvas id="mapCanvas" width="800" height="600" class="map-canvas"></canvas>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #FF4444;"></div>
+                    <span>IoT Device</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #2196F3;"></div>
+                    <span>Wi-Fi</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #9C27B0;"></div>
+                    <span>5G</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-icon" style="background: #FF9800;"></div>
+                    <span>BLE</span>
+                </div>
             </div>
             <div class="status-bar" id="statusBar">
-                Ready - Click "Start Simulation" to begin
+                ⚡ System Ready
             </div>
         </div>
 
@@ -413,32 +706,12 @@
                 </div>
                 <div class="info-item">
                     <span class="info-label">Task:</span>
-                    <span class="task-badge task-idle" id="currentTask">IDLE_MONITORING</span>
-                </div>
-            </div>
-
-            <!-- Available Networks -->
-            <div class="control-section">
-                <h3>📡 Available Networks</h3>
-                <div class="network-list" id="networkList">
-                    <div class="network-item">
-                        <span class="network-name">No networks detected</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Decision Result -->
-            <div class="decision-result" id="decisionResult" style="display: none;">
-                <h4>🎯 Network Decision</h4>
-                <div class="info-item">
-                    <span class="info-label">Selected:</span>
-                    <span class="info-value" id="selectedNetwork">-</span>
+                    <span class="info-value" id="currentTask">IDLE_MONITORING</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">Cost:</span>
-                    <span class="info-value" id="selectedCost">-</span>
+                    <span class="info-label">Networks:</span>
+                    <div id="availableNetworks">-</div>
                 </div>
-                <div class="cost-comparison" id="costComparison"></div>
             </div>
 
             <!-- Controls -->
@@ -446,17 +719,14 @@
                 <h3>🎮 Controls</h3>
 
                 <!-- AI/ML Toggle -->
-                <div class="control-group"
-                    style="margin-bottom: 15px; padding: 10px; background: rgba(103, 58, 183, 0.1); border-radius: 8px; border: 2px solid rgba(103, 58, 183, 0.3);">
+                <div class="ai-toggle-section">
                     <div class="animation-toggle">
                         <span style="font-weight: 600;">🤖 Use AI/ML Mode</span>
                         <div class="toggle-switch active" id="useAIToggle">
                             <div class="toggle-knob"></div>
                         </div>
                     </div>
-                    <small style="display: block; margin-top: 5px; color: #666; font-size: 11px;">
-                        Switch between MCDM (Math) and Random Forest (AI)
-                    </small>
+                    <small>Switch between MCDM (Mathematical) and Random Forest (AI)</small>
                 </div>
 
                 <div class="animation-toggle">
@@ -475,28 +745,43 @@
             <!-- Task Selection -->
             <div class="control-section">
                 <h3>📋 Select Task</h3>
-                <select id="taskSelector" class="btn btn-secondary">
+                <select id="taskSelector" class="btn btn-secondary" style="width: 100%;">
                     <option value="IDLE_MONITORING">Idle Monitoring</option>
                     <option value="DATA_BURST_ALERT">Data Burst Alert</option>
                     <option value="VIDEO_STREAMING">Video Streaming</option>
                 </select>
             </div>
 
-            <!-- System Status -->
-            <div class="control-section">
-                <h3>⚙️ System Status</h3>
-                <div class="info-item">
-                    <span class="info-label">API Status:</span>
-                    <span class="info-value" id="apiStatus">Checking...</span>
+            <!-- Metrics Dashboard -->
+            <div class="control-section metrics-dashboard" id="decisionResult">
+                <h3>📊 Decision Metrics</h3>
+
+                <div class="selected-network-display">
+                    <div class="network-label" id="decisionMethod">AI SELECTED</div>
+                    <div class="network-name" id="selectedNetwork">-</div>
                 </div>
-                <div class="info-item">
-                    <span class="info-label">Map Size:</span>
-                    <span class="info-value" id="mapSize">1000x1000</span>
+
+                <div class="metric-item" id="confidenceMetric" style="display: none;">
+                    <div class="metric-label">
+                        <span>AI Confidence</span>
+                        <span class="metric-value" id="confidenceValue">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="confidenceBar" style="width: 0%;"></div>
+                    </div>
                 </div>
-                <div class="info-item">
-                    <span class="info-label">Base Stations:</span>
-                    <span class="info-value" id="baseStations">12</span>
+
+                <div class="metric-item" id="costMetric" style="display: none;">
+                    <div class="metric-label">
+                        <span>Optimization Cost</span>
+                        <span class="metric-value" id="costValue">0.00</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="costBar" style="width: 0%;"></div>
+                    </div>
                 </div>
+
+                <div class="cost-comparison" id="costComparison"></div>
             </div>
         </div>
     </div>
