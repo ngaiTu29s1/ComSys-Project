@@ -409,12 +409,40 @@ def make_decision_ml(device_state: DeviceState) -> Dict:
                 station_id = f"{network_type}-1"
                 logger.warning(f"⚠️  No base stations found, using default: {station_id}")
         
+        # Calculate cost for all available networks (for comparison)
+        network_costs = {}
+        for network in device_state.available_networks:
+            network_name = network.name
+            
+            # Kiểm tra network config có tồn tại không
+            if network_name not in simulation_engine.network_configs:
+                continue
+            
+            # Lấy network config
+            network_config = simulation_engine.network_configs[network_name]
+            
+            # Tính chi phí cho mạng này
+            cost = calculate_cost(
+                network_state=network,
+                network_config=network_config,
+                task=device_state.current_task
+            )
+            
+            # Store cost with station_id if available
+            station_key = network.station_id if hasattr(network, 'station_id') and network.station_id else network_name
+            network_costs[station_key] = round(cost, 2)
+        
+        # Get cost of selected network
+        selected_cost = network_costs.get(station_id, 0.0)
+        
         # Prepare response
         response_data = {
             "selected_network": target_network_type,
             "station_id": station_id,
             "method": method,
             "confidence": round(confidence, 4),
+            "cost": selected_cost,
+            "all_network_costs": network_costs,
             "device_info": {
                 "position": device_state.position,
                 "current_task": device_state.current_task.value

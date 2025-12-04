@@ -601,11 +601,11 @@ class MapVisualization {
         const isFallback = this.decisionResult.method === 'MCDM_Fallback';
 
         if (isAIMode) {
-            // AI/ML mode
+            // AI/ML mode: show confidence for selected network
             decisionMethod.textContent = isFallback ? 'AI (FALLBACK)' : 'AI SELECTED';
             confidenceMetric.style.display = 'block';
             costMetric.style.display = 'none';
-            decisionMetricHeader.innerHTML = 'Conf/Cost<br><small>(% / ~)</small>';
+            decisionMetricHeader.innerHTML = 'Conf/Cost<br><small>(% / score)</small>';
 
             const confidence = this.decisionResult.confidence !== null
                 ? this.decisionResult.confidence * 100
@@ -613,12 +613,11 @@ class MapVisualization {
             document.getElementById('confidenceValue').textContent = `${confidence.toFixed(1)}%`;
             document.getElementById('confidenceBar').style.width = `${confidence}%`;
 
-            // Show warning if fallback
             if (isFallback) {
-                console.warn('⚠️ ML prediction used MCDM fallback - confidence may be 100%');
+                console.warn('⚠️ ML prediction used MCDM fallback');
             }
         } else {
-            // MCDM mode
+            // MCDM mode: show cost
             decisionMethod.textContent = 'MATH CALCULATED';
             confidenceMetric.style.display = 'none';
             costMetric.style.display = 'block';
@@ -659,29 +658,27 @@ class MapVisualization {
                 ? (network.packet_loss_rate * 100).toFixed(2)
                 : '-';
 
-            // Get cost or confidence for this network
+            // Get metric for this network: confidence for AI mode selected, cost for all
             let decisionMetric = '-';
             let decisionBar = '';
 
             if (isAIMode) {
-                // For AI mode: show confidence for selected, estimated cost for others
+                // AI mode: show confidence for selected network
                 if (isSelected && this.decisionResult.confidence !== null) {
                     const conf = (this.decisionResult.confidence * 100).toFixed(1);
-                    decisionMetric = conf;
+                    decisionMetric = `${conf}%`;
                     decisionBar = `<div class="confidence-bar-mini"><div class="confidence-fill-mini" style="width: ${conf}%"></div></div>`;
-                } else {
-                    // Calculate estimated cost for non-selected networks
-                    const estimatedCost = this.calculateEstimatedCost(network);
-                    if (estimatedCost !== null) {
-                        decisionMetric = `~${estimatedCost.toFixed(2)}`;
-                        const costPercent = Math.min(100, (estimatedCost / 50) * 100);
-                        decisionBar = `<div class="confidence-bar-mini"><div class="confidence-fill-mini" style="width: ${costPercent}%; opacity: 0.5;"></div></div>`;
-                    }
+                } else if (this.decisionResult.allCosts && this.decisionResult.allCosts[network.station_id]) {
+                    // Show cost for non-selected networks
+                    const cost = this.decisionResult.allCosts[network.station_id];
+                    decisionMetric = cost.toFixed(2);
+                    const costPercent = Math.min(100, (cost / 50) * 100);
+                    decisionBar = `<div class="confidence-bar-mini"><div class="confidence-fill-mini" style="width: ${costPercent}%; opacity: 0.5;"></div></div>`;
                 }
             } else {
-                // For MCDM mode, show cost for all networks if available
-                if (this.decisionResult.allCosts && this.decisionResult.allCosts[network.name]) {
-                    const cost = this.decisionResult.allCosts[network.name];
+                // MCDM mode: show cost for all networks
+                if (this.decisionResult.allCosts && this.decisionResult.allCosts[network.station_id]) {
+                    const cost = this.decisionResult.allCosts[network.station_id];
                     decisionMetric = cost.toFixed(2);
                     const costPercent = Math.min(100, (cost / 50) * 100);
                     decisionBar = `<div class="confidence-bar-mini"><div class="confidence-fill-mini" style="width: ${costPercent}%"></div></div>`;
