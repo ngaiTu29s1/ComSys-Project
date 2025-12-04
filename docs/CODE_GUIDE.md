@@ -4,9 +4,9 @@
 > 
 > **Mục đích:** Giải thích chi tiết từng file, từng hàm, từng chức năng trong dự án
 > 
-> **Trạng thái:** MVP hoàn chỉnh - Sẵn sàng tích hợp Machine Learning
+> **Trạng thái:** ML-Integrated - Random Forest Model hoạt động (99.5% accuracy)
 > 
-> **Cập nhật:** December 4, 2025 (Pre-ML Integration)
+> **Cập nhật:** December 4, 2025 (ML Integration Complete)
 
 ---
 
@@ -18,14 +18,18 @@
 1. Đọc [`app/models/schemas.py`](#1-appmodelsschemaspy) - Hiểu cấu trúc dữ liệu
 2. Đọc [`app/services/network_physics.py`](#2-appservicesnetwork_physicspy) - Hiểu mô hình vật lý
 3. Đọc [`app/services/simulation.py`](#3-appservicessimulationpy) - Hiểu engine mô phỏng
-4. Đọc [`app/core/decision_logic.py`](#4-appcoredesicion_logicpy) - Hiểu thuật toán quyết định
-5. Đọc [`app/main.py`](#5-appmainpy) - Hiểu API endpoints
-6. Đọc [`web/map-visualization.js`](#6-webmap-visualizationjs) - Hiểu giao diện
+4. Đọc [`app/core/decision_logic.py`](#4-appcoredesicion_logicpy) - Hiểu thuật toán MCDM baseline
+5. Đọc [`app/ml/`](#7-appml---machine-learning-module) - Hiểu ML infrastructure
+6. Đọc [`scripts/`](#8-scripts---training-scripts) - Hiểu quy trình train model
+7. Đọc [`app/main.py`](#5-appmainpy) - Hiểu API endpoints
+8. Đọc [`web/map-visualization.js`](#6-webmap-visualizationjs) - Hiểu giao diện
 
 **Nếu bạn muốn hiểu một chức năng cụ thể:**
 - **Muốn hiểu QoS tính thế nào?** → Đọc [`network_physics.py`](#2-appservicesnetwork_physicspy)
 - **Muốn hiểu thiết bị di chuyển thế nào?** → Đọc [`simulation.py`](#3-appservicessimulationpy)
-- **Muốn hiểu cách chọn mạng?** → Đọc [`decision_logic.py`](#4-appcoredesicion_logicpy)
+- **Muốn hiểu cách chọn mạng (MCDM)?** → Đọc [`decision_logic.py`](#4-appcoredesicion_logicpy)
+- **Muốn hiểu ML model?** → Đọc [`app/ml/`](#7-appml---machine-learning-module)
+- **Muốn train model mới?** → Đọc [`scripts/`](#8-scripts---training-scripts)
 - **Muốn test API?** → Đọc [`main.py`](#5-appmainpy)
 
 ---
@@ -45,7 +49,14 @@
 │   │
 │   ├── 📁 core/                     # Logic nghiệp vụ cốt lõi
 │   │   ├── 📄 __init__.py
-│   │   └── 📄 decision_logic.py    # ⭐ Thuật toán MCDM chọn mạng
+│   │   └── 📄 decision_logic.py    # ⭐ Thuật toán MCDM baseline
+│   │
+│   ├── 📁 ml/                       # ⭐ Machine Learning module
+│   │   ├── 📄 __init__.py
+│   │   ├── 📄 data_collector.py    # ⭐ Thu thập training data
+│   │   ├── 📄 feature_engineering.py # Feature processing
+│   │   ├── 📄 train_model.py       # ⭐ Model training logic
+│   │   └── 📄 predictor.py         # ⭐ ML inference
 │   │
 │   └── 📁 services/                 # Các service hỗ trợ
 │       ├── 📄 __init__.py
@@ -64,13 +75,25 @@
 │   └── 📄 POSTMAN_GUIDE.md         # Hướng dẫn test API
 │
 ├── 📁 tests/                        # Unit tests
-│   ├── 📄 test_decision_logic.py   # Test thuật toán quyết định
+│   ├── 📄 test_decision_logic.py   # Test thuật toán MCDM
 │   ├── 📄 test_simulation.py       # Test engine mô phỏng
 │   ├── 📄 test_api.py              # Test API endpoints
+│   ├── 📄 test_ml_inference.py     # ⭐ Test ML predictor
 │   └── 📄 smoke_env.py             # Kiểm tra môi trường
 │
-├── 📁 scripts/                      # Utility scripts
-│   └── 📄 clean-conda-temp.ps1     # Dọn thư mục temp của Conda
+├── 📁 scripts/                      # ⭐ Training scripts
+│   ├── 📄 collect_training_data.py # ⭐ Thu thập dataset
+│   ├── 📄 train_model.py           # ⭐ Train Random Forest
+│   └── 📄 clean-conda-temp.ps1     # Utility: dọn Conda temp
+│
+├── 📁 data/                         # ⭐ Datasets (gitignored)
+│   ├── 📁 raw/                     # Raw CSV từ simulation
+│   └── 📁 processed/               # Cleaned data
+│
+├── 📁 models/                       # ⭐ Trained models (gitignored)
+│   └── 📄 rf_network_selector.pkl  # Random Forest model
+│
+├── 📁 notebooks/                    # Jupyter notebooks (optional)
 │
 ├── 📄 demo_*.py                     # Demo scripts
 ├── 📄 environment.yml               # Conda environment setup
@@ -1220,7 +1243,328 @@ handleCanvasClick(e) {
 
 ---
 
-## 🔄 LUỒNG HOẠT ĐỘNG
+### 7. `app/ml/` - Machine Learning Module
+
+**Mục đích:** Cung cấp ML-based network selection thay thế cho MCDM baseline.
+
+---
+
+#### 📁 `app/ml/__init__.py`
+
+**Chức năng:** Export các classes chính để dễ import.
+
+```python
+from .data_collector import DataCollector
+from .predictor import MLPredictor
+
+__all__ = ["DataCollector", "MLPredictor"]
+```
+
+---
+
+#### 📁 `app/ml/data_collector.py`
+
+**Mục đích:** Thu thập training data từ simulation engine với MCDM labels.
+
+#### 🔹 Class `DataCollector`
+
+**Workflow:**
+1. Chạy simulation nhiều lần
+2. Mỗi bước: lấy `device_state`
+3. Dùng MCDM để tìm optimal network → **gán nhãn**
+4. Trích xuất 18 features + 1 label
+5. Lưu vào CSV
+
+#### 📍 Method `collect(num_samples)`
+
+**Chức năng:** Thu thập N samples từ simulation.
+
+**Logic:**
+```python
+for i in range(num_samples):
+    device_state = engine.run_simulation_step()
+    
+    # MCDM làm "giáo viên" gán nhãn
+    optimal_network, cost = select_best_network(
+        device_state.available_networks,
+        network_configs,
+        device_state.current_task
+    )
+    
+    # Extract 18 features
+    features = self._extract_features(device_state, optimal_network)
+    self.samples.append(features)
+```
+
+#### 📍 Method `_extract_features()`
+
+**18 Features được trích xuất:**
+
+1. **Device context (3 features):**
+   - `position_x`, `position_y`: Tọa độ thiết bị
+   - `task_type`: 0=IDLE, 1=ALERT, 2=VIDEO
+
+2. **Wi-Fi metrics (5 features):**
+   - `wifi_rssi`, `wifi_snr`, `wifi_bandwidth`, `wifi_latency`, `wifi_distance`
+
+3. **5G metrics (5 features):**
+   - `5g_rssi`, `5g_snr`, `5g_bandwidth`, `5g_latency`, `5g_distance`
+
+4. **BLE metrics (5 features):**
+   - `ble_rssi`, `ble_snr`, `ble_bandwidth`, `ble_latency`, `ble_distance`
+
+**Default values khi network không available:**
+- `rssi = -999.0` (tín hiệu không có)
+- `snr = -999.0`
+- `bandwidth = 0.0`
+- `latency = 9999` (vô cùng lớn)
+- `distance = 9999.0`
+
+**Label:**
+- `optimal_network`: 0=Wi-Fi, 1=5G, 2=BLE (từ MCDM)
+
+---
+
+#### 📁 `app/ml/feature_engineering.py`
+
+**Mục đích:** Preprocessing và transformation cho features.
+
+#### 🔹 Class `FeatureEngineer`
+
+**Chức năng:**
+- `fit_transform()`: Fit scaler trên training data
+- `transform()`: Transform test data hoặc inference data
+- `save()/load()`: Lưu/load fitted scaler
+
+**Note:** Hiện tại không dùng scaling vì Random Forest không cần normalize.
+
+---
+
+#### 📁 `app/ml/train_model.py`
+
+**Mục đích:** Training logic cho Random Forest model.
+
+#### 🔹 Class `ModelTrainer`
+
+**Hyperparameters:**
+```python
+RandomForestClassifier(
+    n_estimators=100,    # 100 trees
+    max_depth=15,        # Tránh overfitting
+    random_state=42,     # Reproducibility
+    n_jobs=-1            # Use all CPU cores
+)
+```
+
+#### 📍 Method `load_data(filepath)`
+
+**Logic:**
+1. Load CSV dataset
+2. Feature engineering (fit_transform)
+3. Train/test split (80/20)
+4. Stratify by label (giữ tỷ lệ class)
+
+#### 📍 Method `train()`
+
+**Steps:**
+1. Fit model trên training set
+2. Tính training accuracy
+3. 5-fold cross-validation
+4. In CV scores
+
+**Kết quả thực tế:**
+```
+Training accuracy: 100.0%
+CV mean: 98.12% (+/- 1.77%)
+```
+
+#### 📍 Method `evaluate()`
+
+**Metrics:**
+- Test accuracy: **99.5%**
+- Confusion matrix
+- Classification report (precision/recall/f1 cho 3 classes)
+- Feature importance
+
+**Top features quan trọng:**
+1. `task_type` (17.96%)
+2. `wifi_distance` (11.56%)
+3. `wifi_bandwidth` (11.30%)
+
+---
+
+#### 📁 `app/ml/predictor.py`
+
+**Mục đích:** Inference logic - sử dụng trained model để predict.
+
+#### 🔹 Class `MLPredictor`
+
+**Initialization:**
+```python
+predictor = MLPredictor("models/rf_network_selector.pkl")
+# Tự động load cả feature_engineer
+```
+
+#### 📍 Method `predict(device_state, available_networks, engine)`
+
+**Workflow:**
+1. Extract 18 features từ `device_state`
+2. Transform features (qua FeatureEngineer)
+3. Model predict → network type (0/1/2)
+4. Map network type → NetworkState object
+5. Return `(best_network, confidence)`
+
+**Ví dụ:**
+```python
+device_state = DeviceState(
+    position=(150, 200),
+    current_task=TaskState.VIDEO_STREAMING,
+    available_networks=[wifi_state, fiveg_state]
+)
+
+best_network, confidence = predictor.predict(
+    device_state, 
+    device_state.available_networks,
+    engine
+)
+
+# Output:
+# best_network = wifi_state (NetworkState object)
+# confidence = 0.96 (96% chắc chắn)
+```
+
+#### 📍 Method `predict_with_probabilities()`
+
+**Return đầy đủ hơn:**
+```python
+{
+    "prediction": "Wi-Fi",
+    "confidence": 0.96,
+    "probabilities": {
+        "Wi-Fi": 0.96,
+        "5G": 0.03,
+        "BLE": 0.01
+    }
+}
+```
+
+**Use case:** Hiển thị probability distribution trên UI.
+
+---
+
+### 8. `scripts/` - Training Scripts
+
+**Mục đích:** CLI scripts để train và collect data.
+
+---
+
+#### 📁 `scripts/collect_training_data.py`
+
+**Chức năng:** Collect training dataset từ simulation.
+
+**Usage:**
+```bash
+python scripts/collect_training_data.py --samples 1000 --output data/raw/training_data.csv
+```
+
+**Arguments:**
+- `--samples`: Số lượng samples (default: 1000)
+- `--output`: Output file path (default: data/raw/training_data.csv)
+
+**Workflow:**
+1. Initialize `SimulationEngine`
+2. Initialize `DataCollector`
+3. Loop 1000 lần:
+   - Chạy simulation step
+   - MCDM gán label
+   - Collect features
+4. Save to CSV
+
+**Output file format:**
+```csv
+position_x,position_y,task_type,wifi_rssi,wifi_snr,...,optimal_network
+150,200,1,-68.4,26.6,...,0
+325,480,2,-75.2,19.8,...,1
+...
+```
+
+---
+
+#### 📁 `scripts/train_model.py`
+
+**Chức năng:** Train Random Forest model từ CSV.
+
+**Usage:**
+```bash
+python scripts/train_model.py \
+  --data data/raw/training_data.csv \
+  --output models/rf_network_selector.pkl \
+  --n-estimators 100 \
+  --max-depth 15
+```
+
+**Arguments:**
+- `--data`: Path to training CSV
+- `--output`: Model output path
+- `--n-estimators`: Số trees (default: 100)
+- `--max-depth`: Max depth (default: 15)
+
+**Workflow:**
+1. Load CSV dataset
+2. Feature engineering + split train/test
+3. Train Random Forest
+4. 5-fold cross-validation
+5. Evaluate on test set
+6. Save model + feature_engineer
+
+**Output files:**
+- `models/rf_network_selector.pkl` - Model chính
+- `models/rf_network_selector_feature_engineer.pkl` - Scaler/encoder
+
+**Console output:**
+```
+============================================================
+🚀 IoT Network Selection - Model Training
+============================================================
+📊 Data: data/raw/training_data.csv
+💾 Output: models/rf_network_selector.pkl
+🌲 n_estimators: 100
+📏 max_depth: 15
+
+📂 Loading data...
+📊 Dataset shape: (1000, 19)
+✅ Train set: (800, 18)
+✅ Test set: (200, 18)
+
+🚀 Training Random Forest model...
+✅ Training accuracy: 1.0000
+🔄 Running 5-fold cross-validation...
+✅ CV mean: 0.9812 (+/- 0.0177)
+
+📊 Evaluating on test set...
+✅ Test accuracy: 0.9950
+
+📋 Classification Report:
+              precision    recall  f1-score   support
+       Wi-Fi       0.93      1.00      0.96        13
+          5G       1.00      0.99      1.00       166
+         BLE       1.00      1.00      1.00        21
+
+🎯 Top 10 Feature Importances:
+       feature  importance
+     task_type    0.179608
+ wifi_distance    0.115602
+wifi_bandwidth    0.113009
+
+💾 Model saved to models/rf_network_selector.pkl
+============================================================
+✅ Model training complete!
+============================================================
+```
+
+---
+
+## 🔄 LUỒNG HOẠT ĐỘNG (CẬP NHẬT VỚI ML)
 
 ### Workflow 1: Chạy Simulation Thủ Công
 
@@ -1628,4 +1972,8 @@ def compare_algorithms():
 
 ---
 
-**📌 Note:** Tài liệu này phản ánh **MVP hoàn chỉnh** trước khi tích hợp ML. Sau khi thêm ML, sẽ có section mới về **ML Decision Logic**.
+**📌 Note:** Hệ thống hiện có **2 decision modes:**
+1. **MCDM Baseline** - Rule-based, explainable
+2. **ML (Random Forest)** - Data-driven, 99.5% accuracy
+
+Cả hai đều có thể sử dụng song song để so sánh performance!
