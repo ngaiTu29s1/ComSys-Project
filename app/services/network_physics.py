@@ -28,7 +28,7 @@ class NetworkPhysics:
             "path_loss_exponent": 3.5,   # Indoor with walls
             "bandwidth_mhz": 20,
             "noise_floor_dbm": -95,
-            "shadowing_sigma": 4.0,
+            "shadowing_sigma": 2.0,      # Reduced from 4.0 for less noise
             "max_throughput_mbps": 100,
             "base_latency_ms": 5,
             "snr_threshold_db": 10       # PLR = 50% at this SNR
@@ -40,7 +40,7 @@ class NetworkPhysics:
             "path_loss_exponent": 3.0,   # Urban
             "bandwidth_mhz": 100,
             "noise_floor_dbm": -100,
-            "shadowing_sigma": 4.0,
+            "shadowing_sigma": 2.5,      # Reduced from 4.0
             "max_throughput_mbps": 200,
             "base_latency_ms": 10,
             "snr_threshold_db": 5
@@ -52,7 +52,7 @@ class NetworkPhysics:
             "path_loss_exponent": 2.5,   # Open space
             "bandwidth_mhz": 2,
             "noise_floor_dbm": -90,
-            "shadowing_sigma": 2.0,
+            "shadowing_sigma": 1.5,      # Reduced from 2.0
             "max_throughput_mbps": 2,
             "base_latency_ms": 20,
             "snr_threshold_db": 8
@@ -260,12 +260,18 @@ class NetworkPhysics:
         )
         bandwidth = min(throughput, config["max_throughput_mbps"])
         
-        # 5. Calculate Packet Loss Rate
+        # 5. Calculate Packet Loss Rate (steeper curve = more realistic)
         plr = NetworkPhysics.calculate_packet_loss_rate(
             snr_db=snr,
             snr_threshold_db=config["snr_threshold_db"],
-            k=0.5
+            k=1.0  # Increased from 0.5 for more realistic PLR behavior
         )
+        
+        # Clamp minimum PLR for very high SNR (physical limit ~0.01%)
+        if snr > 30:
+            plr = min(plr, 0.001)  # Max 0.1% for excellent signal
+        elif snr > 20:
+            plr = min(plr, 0.01)   # Max 1% for good signal
         
         # 6. Calculate Latency (base latency + retransmission overhead)
         # Assumption: each 1% PLR adds 10ms latency due to retransmit
