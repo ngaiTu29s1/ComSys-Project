@@ -418,8 +418,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ## 📧 Contact
 
-**Author:** Ngài Tứ  
-**Email:** [your-email@example.com]  
+**Author:** Tuan Tu Tran 
+**Email:** [trantuantu2004@gmail.com]  
 **GitHub:** [@ngaiTu29s1](https://github.com/ngaiTu29s1)
 
 ---
