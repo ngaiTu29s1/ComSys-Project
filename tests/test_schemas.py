@@ -29,20 +29,20 @@ def test_network_config():
     # Tạo config cho Wi-Fi
     wifi_config = NetworkConfig(
         name="Wi-Fi",
-        energy_tx=0.5,
-        energy_idle=10.0,
+        power_tx=100.0,
+        power_idle=10.0,
         energy_wakeup=2.0
     )
     
     print(f"Wi-Fi config: {wifi_config}")
     assert wifi_config.name == "Wi-Fi"
-    assert wifi_config.energy_tx == 0.5
+    assert wifi_config.power_tx == 100.0
     
     # Tạo config cho 5G
     g5_config = NetworkConfig(
         name="5G",
-        energy_tx=1.2,
-        energy_idle=15.0,
+        power_tx=300.0,
+        power_idle=15.0,
         energy_wakeup=5.0
     )
     

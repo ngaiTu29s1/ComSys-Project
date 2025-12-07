@@ -25,10 +25,10 @@ def calculate_energy_cost(network_config: NetworkConfig,
     Tính toán chi phí năng lượng dự kiến cho một mạng và tác vụ.
     
     CÔNG THỨC ĐƠN GIẢN HÓA (Option A - Simplified):
-    E_total = (energy_tx × DataSize) + E_wakeup
-    
-    Giả định: energy_tx (mJ/KB) ĐÃ BAO GỒM cả RF power + circuit overhead.
-    Không cần nhân thêm với T_tx vì đã được normalize theo KB.
+    E_total ≈ (power_tx * T_tx) + E_wakeup
+
+    - power_tx (mW == mJ/s)
+    - T_tx ~ (data_size_Mb / bandwidth_Mbps) (giây)
     
     Args:
         network_config: Cấu hình tĩnh của mạng
@@ -40,9 +40,14 @@ def calculate_energy_cost(network_config: NetworkConfig,
     """
     # Lấy ước tính kích thước dữ liệu từ constants
     estimated_data_kb = get_task_data_size(task)
-    
-    # Năng lượng truyền (bao gồm RF + circuit)
-    transmission_energy = estimated_data_kb * network_config.energy_tx  # mJ
+
+    # Ước tính thời gian truyền (s): (KB -> Mb) / bandwidth(Mbps)
+    data_mb = estimated_data_kb * 8.0 / 1000.0
+    bandwidth_mbps = max(network_state.bandwidth, 1e-3)
+    tx_time_s = data_mb / bandwidth_mbps
+
+    # Năng lượng truyền (mJ): power_tx (mW == mJ/s) * thời gian truyền (s)
+    transmission_energy = network_config.power_tx * tx_time_s
     
     # Chi phí khởi động radio
     wakeup_energy = network_config.energy_wakeup  # mJ
