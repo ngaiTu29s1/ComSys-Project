@@ -37,18 +37,48 @@ class DataCollector:
         self.network_configs = network_configs
         self.samples: List[Dict] = []
     
-    def collect(self, num_samples: int = 1000):
+    def collect(self, num_samples: int = 36000):
         """
-        Thu thập training samples từ simulation.
+        Thu thập training samples từ simulation với strategy cải tiến:
+        - Grid-based sampling để cover đều map
+        - Balanced task distribution (không theo xác suất tự nhiên)
         
         Args:
             num_samples: Số lượng samples cần thu thập
         """
         print(f"🚀 Collecting {num_samples} training samples...")
+        print(f"📍 Strategy: Grid-based + Balanced tasks")
+        
+        # Balanced task distribution (chia đều 3 tasks)
+        import random
+        tasks = [TaskState.IDLE_MONITORING, TaskState.DATA_BURST_ALERT, TaskState.VIDEO_STREAMING]
+        task_cycle = [tasks[i % 3] for i in range(num_samples)]
+        random.shuffle(task_cycle)  # Shuffle để không quá sequential
+        
+        # Grid-based position sampling
+        map_size = self.simulation_engine.map_size
+        grid_step = 50  # Sample mỗi 50 pixels
         
         for i in range(num_samples):
-            # Run simulation step
-            device_state = self.simulation_engine.run_simulation_step()
+            # Đặt position theo grid + random offset
+            grid_x = (i * grid_step) % map_size[0]
+            grid_y = ((i * grid_step) // map_size[0] * grid_step) % map_size[1]
+            offset_x = random.randint(-25, 25)
+            offset_y = random.randint(-25, 25)
+            new_pos = (
+                max(0, min(grid_x + offset_x, map_size[0] - 1)),
+                max(0, min(grid_y + offset_y, map_size[1] - 1))
+            )
+            
+            # Đặt task theo balanced distribution
+            new_task = task_cycle[i]
+            
+            # Cập nhật device state thủ công (không dùng run_simulation_step)
+            self.simulation_engine.device_state.position = new_pos
+            self.simulation_engine.device_state.current_task = new_task
+            self.simulation_engine._update_available_networks()
+            
+            device_state = self.simulation_engine.device_state
             
             # Nếu không có mạng khả dụng, skip
             if len(device_state.available_networks) == 0:
@@ -66,14 +96,31 @@ class DataCollector:
                 sample = self._extract_features(device_state, optimal_network)
                 self.samples.append(sample)
                 
-                if (i + 1) % 100 == 0:
-                    print(f"  ✅ Collected {i + 1}/{num_samples} samples")
+                if (i + 1) % 1000 == 0:
+                    print(f"  ✅ Collected {i + 1}/{num_samples} samples (Task dist: {self._get_task_distribution()})")
                     
             except Exception as e:
                 print(f"  ⚠️ Error at step {i}: {e}")
                 continue
         
         print(f"✅ Collection complete: {len(self.samples)} valid samples")
+        print(f"📊 Task distribution: {self._get_task_distribution()}")
+        print(f"🎯 Network distribution: {self._get_network_distribution()}")
+    
+    def _get_task_distribution(self) -> dict:
+        """Thống kê phân bố task types"""
+        from collections import Counter
+        tasks = [s['task_type'] for s in self.samples]
+        counts = Counter(tasks)
+        return {f'Task{k}': v for k, v in counts.items()}
+    
+    def _get_network_distribution(self) -> dict:
+        """Thống kê phân bố optimal networks"""
+        from collections import Counter
+        networks = [s['optimal_network'] for s in self.samples]
+        counts = Counter(networks)
+        mapping = {0: 'Wi-Fi', 1: '5G', 2: 'BLE'}
+        return {mapping[k]: v for k, v in counts.items()}
     
     def _extract_features(self, device_state: DeviceState, optimal_network: NetworkState) -> Dict:
         """
