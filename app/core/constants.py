@@ -124,7 +124,10 @@ class NetworkPhysicsConfig:
         "spectral_efficiency": 0.7,     # Hiệu suất phổ (η)
         "base_latency_ms": 5.0,         # Độ trễ cơ bản (ms)
         "snr_threshold_db": 10.0,       # Ngưỡng SNR tối thiểu (dB)
-        "plr_sigmoid_k": 1.0            # Hệ số sigmoid cho PLR
+        "plr_sigmoid_k": 1.0,           # Hệ số sigmoid cho PLR
+        "frequency_ghz": 2.4,           # Tần số sóng mang (GHz)
+        "ref_path_loss_db": 40.0,       # PL(d0) tại 1m
+        "max_throughput_mbps": 100.0    # Giới hạn throughput
     }
     
     FIVEG = {
@@ -137,7 +140,10 @@ class NetworkPhysicsConfig:
         "spectral_efficiency": 0.8,     # Hiệu suất cao nhờ MIMO
         "base_latency_ms": 10.0,        # Độ trễ cơ bản
         "snr_threshold_db": 5.0,        # Ngưỡng thấp nhờ coding tốt
-        "plr_sigmoid_k": 1.0
+        "plr_sigmoid_k": 1.0,
+        "frequency_ghz": 3.5,           # Tần số sóng mang (GHz)
+        "ref_path_loss_db": 44.0,       # PL(d0) tại 1m
+        "max_throughput_mbps": 200.0    # Giới hạn throughput
     }
     
     BLE = {
@@ -150,7 +156,10 @@ class NetworkPhysicsConfig:
         "spectral_efficiency": 0.5,     # Hiệu suất thấp (simple modulation)
         "base_latency_ms": 20.0,        # Độ trễ cao
         "snr_threshold_db": 8.0,        # Ngưỡng trung bình
-        "plr_sigmoid_k": 1.0
+        "plr_sigmoid_k": 1.0,
+        "frequency_ghz": 2.4,           # Tần số sóng mang (GHz)
+        "ref_path_loss_db": 40.0,       # PL(d0) tại 1m
+        "max_throughput_mbps": 2.0      # Giới hạn throughput
     }
 
 
