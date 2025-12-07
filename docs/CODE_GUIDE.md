@@ -1,42 +1,84 @@
-# Hướng Dẫn Code Chi Tiết - Hệ Thống Lựa Chọn Mạng IoT
+# 📘 Complete Code Guide - IoT Network Selection System
 
 > **Dành cho:** Developers, Researchers, Contributors
 > 
-> **Mục đích:** Giải thích chi tiết cấu trúc code, API, workflows, và cách mở rộng
+> **Mục đích:** Giải thích chi tiết kiến trúc, công thức, API, và ML pipeline
 > 
-> **Status Stack:** Python 3.11 | FastAPI | Random Forest (99.5% accuracy) | Dark UI
+> **Tech Stack:** Python 3.11 | FastAPI | Random Forest (99.9% accuracy) | Physics-based QoS
 > 
-> **Cập nhật:** December 4, 2025 (Metrics & Cost Unification Complete)
+> **Cập nhật:** December 7, 2025 (Energy Formula Refactor + Constants Centralization)
 > 
-> **Liên Quan:** Xem [`RESEARCH_REPORT.md`](RESEARCH_REPORT.md) cho chi tiết toán học
+> **Liên quan:** [`congthuc.md`](congthuc.md) cho chi tiết toán học
 
 ---
 
-## 🚀 THAY ĐỔI GẦN ĐÂY (Latest Updates)
+## 🚀 MAJOR UPDATES (December 7, 2025)
 
-### December 4, 2025 - Metrics & Cost Unification
+### ⚡ Energy Formula Simplification
 
-✅ **Backend Changes:**
-- `/simulation/step`: Trả về đầy đủ QoS metrics (`rssi`, `snr`, `packet_loss_rate`)
-- `/decision`: Dùng `station_id` làm key cho `all_network_costs` (không phải network type)
-- `/decision/ml`: Bổ sung `all_network_costs` dict + `cost` field
+**Before (Complex):**
+```
+E_total = (energy_tx × T_tx) + (energy_idle × T_idle) + E_wakeup
+```
 
-✅ **Frontend Changes:**
-- Hiển thị **Confidence %** cho AI mode (selected network only)
-- Hiển thị **Cost score** cho tất cả networks (MCDM calculation)
-- Table metrics đầy đủ: BW, Lat, RSSI, SNR, PLR, Cost
-- Station ID labels: `WiFi-4`, `5G-2`, `BLE-3` (không phải chỉ loại mạng)
+**After (Simplified):**
+```
+E_total = (energy_tx × DataSize) + E_wakeup
+```
 
-✅ **Physics Model:**
-- Increased k=1.0 (steeper PLR curve, realistic values)
-- Reduced shadowing sigma (less noise): Wi-Fi 2.0, 5G 2.5, BLE 1.5
-- Hard limits: SNR > 30dB → PLR ≤ 0.1%
+**Rationale:**
+- `energy_tx` (mJ/KB) already includes RF power + circuit overhead
+- No need to multiply by transmission time (normalized per KB)
+- Idle energy removed (negligible for short bursts)
+- Easier to interpret and scale to new network types
 
-✅ **Data & Scripts:**
-- Removed from `.gitignore` (needed for reproducibility)
-- `data/raw/training_data.csv` now tracked
-- `models/rf_network_selector.pkl` now tracked
-- `scripts/*.py` tools now tracked
+**Impact:** Cleaner code, more predictable ML features, easier parameter tuning
+
+---
+
+### 🏗️ Architecture Refactor: Constants & Formulas Separation
+
+**New Structure:**
+```
+app/core/
+├── constants.py       # ⭐ ALL parameters (energy, QoS, physics, ML)
+├── formulas.py        # ⭐ Reusable math functions (pure functions)
+└── decision_logic.py  # MCDM algorithm (uses constants + formulas)
+```
+
+**Key Principles:**
+1. **Single Source of Truth:** All constants in `constants.py`
+2. **Pure Functions:** All formulas in `formulas.py` (no side effects)
+3. **Clear Separation:** Config ≠ Formulas ≠ Logic
+4. **Easy Extension:** Add new network type → update `constants.py` only
+
+**Benefits:**
+- No hardcoded values scattered in code
+- Easy to modify parameters without touching logic
+- Reusable formulas across modules
+- Testable pure functions
+
+---
+
+### 📊 ML Pipeline Improvements
+
+**Training Data:**
+- **36,000 samples** (3× increase from 12k)
+- **Grid-based sampling** (50m intervals) → better coverage
+- **Balanced task distribution** (33% each task) → no bias
+- **Comprehensive metrics** (18 features including RSSI, SNR, PLR)
+
+**Model Performance:**
+- **Test accuracy:** 99.89% (CV: 99.90% ±0.08%)
+- **Unseen data:** 100% (verified no overfitting)
+- **Training time:** ~30 seconds (100 trees, depth 15)
+- **Inference:** <50ms per prediction
+
+**Validation:**
+- 5-fold cross-validation
+- Unseen data test (1000 fresh samples)
+- MCDM baseline comparison
+- Feature importance analysis
 
 ---
 
@@ -44,23 +86,23 @@
 
 ### Lộ Trình Đọc Code Theo Thứ Tự
 
-**Nếu bạn hoàn toàn mới:**
-1. Đọc [`app/models/schemas.py`](#1-appmodelsschemaspy) - Hiểu cấu trúc dữ liệu
-2. Đọc [`app/services/network_physics.py`](#2-appservicesnetwork_physicspy) - Hiểu mô hình vật lý
-3. Đọc [`app/services/simulation.py`](#3-appservicessimulationpy) - Hiểu engine mô phỏng
-4. Đọc [`app/core/decision_logic.py`](#4-appcoredesicion_logicpy) - Hiểu thuật toán MCDM baseline
-5. Đọc [`app/ml/`](#7-appml---machine-learning-module) - Hiểu ML infrastructure
-6. Đọc [`scripts/`](#8-scripts---training-scripts) - Hiểu quy trình train model
-7. Đọc [`app/main.py`](#5-appmainpy) - Hiểu API endpoints
-8. Đọc [`web/map-visualization.js`](#6-webmap-visualizationjs) - Hiểu giao diện
+**For Beginners (Follow this order):**
+1. [`app/core/constants.py`](#1-appcoreconstantspy) - Understand all system parameters
+2. [`app/core/formulas.py`](#2-appcoreformulaspy) - Understand physics formulas
+3. [`app/models/schemas.py`](#3-appmodelsschemaspy) - Understand data structures
+4. [`app/services/network_physics.py`](#4-appservicesnetwork_physicspy) - Understand QoS coordinator
+5. [`app/services/simulation.py`](#5-appservicessimulationpy) - Understand simulation engine
+6. [`app/core/decision_logic.py`](#6-appcoredesicion_logicpy) - Understand MCDM algorithm
+7. [`app/ml/`](#7-appml-machine-learning) - Understand ML pipeline
+8. [`app/main.py`](#8-appmainpy-api-server) - Understand API endpoints
 
-**Nếu bạn muốn hiểu một chức năng cụ thể:**
-- **Muốn hiểu QoS tính thế nào?** → Đọc [`network_physics.py`](#2-appservicesnetwork_physicspy)
-- **Muốn hiểu thiết bị di chuyển thế nào?** → Đọc [`simulation.py`](#3-appservicessimulationpy)
-- **Muốn hiểu cách chọn mạng (MCDM)?** → Đọc [`decision_logic.py`](#4-appcoredesicion_logicpy)
-- **Muốn hiểu ML model?** → Đọc [`app/ml/`](#7-appml---machine-learning-module)
-- **Muốn train model mới?** → Đọc [`scripts/`](#8-scripts---training-scripts)
-- **Muốn test API?** → Đọc [`main.py`](#5-appmainpy)
+**For Specific Tasks:**
+- **Modify energy params?** → Edit `constants.py::NetworkEnergyConfig`
+- **Modify QoS requirements?** → Edit `constants.py::QOS_REQUIREMENTS`
+- **Add new network type?** → Add to `constants.py` + update `decision_logic.py`
+- **Understand QoS calculation?** → Read `formulas.py` + `network_physics.py`
+- **Train new model?** → Run `scripts/collect_training_data.py` → `scripts/train_model.py`
+- **Test API?** → Read `main.py` + use Postman collection
 
 ---
 
@@ -79,7 +121,9 @@
 │   │
 │   ├── 📁 core/                     # Logic nghiệp vụ cốt lõi
 │   │   ├── 📄 __init__.py
-│   │   └── 📄 decision_logic.py    # ⭐ Thuật toán MCDM baseline
+│   │   ├── 📄 constants.py         # ⭐ Tất cả tham số (energy, QoS, physics, ML)
+│   │   ├── 📄 formulas.py          # ⭐ Công thức vật lý/QoS (pure functions)
+│   │   └── 📄 decision_logic.py    # ⭐ Thuật toán MCDM (dùng constants + formulas)
 │   │
 │   ├── 📁 ml/                       # ⭐ Machine Learning module
 │   │   ├── 📄 __init__.py
@@ -254,216 +298,23 @@ device = DeviceState(
 
 ### 2. `app/services/network_physics.py`
 
-**Mục đích:** Implement các công thức vật lý thực tế để tính QoS dựa trên khoảng cách.
+**Mục đích:** Coordinator tính QoS bằng cách **dùng constants + formulas**.
 
-#### 🔹 Class `NetworkPhysics`
+#### 🔹 Vai trò
+- Lấy tham số vật lý từ `app/core/constants.py::NetworkPhysicsConfig`
+- Gọi các hàm thuần từ `app/core/formulas.py` để tính RSSI, SNR, throughput, PLR, latency
+- Trả về QoS metrics + cờ `is_available`
 
-**Tổng quan:** Chứa các phương thức tĩnh (static methods) để tính toán các chỉ số sóng vô tuyến.
+#### 🔹 Luồng tính QoS (`calculate_qos`)
+1) Path loss → RSSI → SNR (từ formulas)
+2) Check availability: `SNR > 0 dB`
+3) Throughput: Shannon-Hartley, clamp `max_throughput_mbps`
+4) Packet loss: Sigmoid PLR + clamp high-SNR
+5) Latency: `base_latency_ms + PLR * 100 * overhead_per_percent`
 
-#### 📍 `CONFIGS` Dictionary
+**Outputs:** `bandwidth`, `latency`, `packet_loss`, `rssi`, `snr`, `is_available`
 
-```python
-CONFIGS = {
-    "Wi-Fi": {
-        "frequency_ghz": 2.4,          # Tần số (GHz)
-        "tx_power_dbm": 20,            # Công suất phát (dBm)
-        "ref_path_loss_db": 40,        # Path loss tham chiếu tại 1m
-        "path_loss_exponent": 3.5,     # Hệ số suy hao (indoor)
-        "bandwidth_mhz": 20,           # Băng thông (MHz)
-        "noise_floor_dbm": -95,        # Ngưỡng nhiễu (dBm)
-        "shadowing_sigma": 4.0,        # Độ lệch chuẩn shadowing
-        "max_throughput_mbps": 100,    # Throughput tối đa
-        "base_latency_ms": 5,          # Latency cơ bản
-        "snr_threshold_db": 10         # Ngưỡng SNR (PLR=50%)
-    },
-    # ... tương tự cho "5G" và "BLE"
-}
-```
-
-**Giải thích:**
-- `path_loss_exponent`: Môi trường khác nhau có hệ số khác:
-  - `2.0` = open space (ngoài trời)
-  - `3.5` = indoor với tường (Wi-Fi)
-  - `3.0` = urban (5G)
-- `shadowing_sigma`: Độ biến động ngẫu nhiên của tín hiệu
-
-#### 📍 Hàm `calculate_path_loss()`
-
-```python
-@staticmethod
-def calculate_path_loss(distance, path_loss_exponent, d0=1.0, pl0=40.0, sigma=4.0):
-    """Tính Path Loss theo Log-Distance Shadowing Model.
-    
-    Công thức: PL(d) = PL(d0) + 10*n*log10(d/d0) + X_sigma
-    """
-```
-
-**Chức năng:** Tính độ suy hao tín hiệu theo khoảng cách.
-
-**Giải thích công thức:**
-- `PL(d0)`: Path loss tại khoảng cách tham chiếu (1m)
-- `10*n*log10(d/d0)`: Suy hao logarit theo khoảng cách
-- `X_sigma`: Nhiễu ngẫu nhiên (Gaussian) do vật cản
-
-**Ví dụ thực tế:**
-```python
-# Tính path loss của Wi-Fi tại khoảng cách 50m
-pl = NetworkPhysics.calculate_path_loss(
-    distance=50,
-    path_loss_exponent=3.5,  # Indoor
-    pl0=40,
-    sigma=4.0
-)
-# Kết quả: ~99.5 dB (± 4 dB do shadowing)
-```
-
-#### 📍 Hàm `calculate_rssi()`
-
-```python
-@staticmethod
-def calculate_rssi(network_type, distance):
-    """Tính RSSI (Received Signal Strength Indicator).
-    
-    Công thức: RSSI = P_tx - PL(d)
-    """
-```
-
-**Chức năng:** Tính cường độ tín hiệu thu được.
-
-**Giải thích:**
-- `P_tx`: Công suất phát (dBm)
-- `PL(d)`: Path loss tính được ở trên
-- RSSI càng cao → tín hiệu càng mạnh
-
-**Ví dụ:**
-```python
-rssi = NetworkPhysics.calculate_rssi("Wi-Fi", 50)
-# Wi-Fi: P_tx = 20 dBm, PL(50m) ≈ 99.5 dB
-# → RSSI ≈ 20 - 99.5 = -79.5 dBm
-```
-
-#### 📍 Hàm `calculate_snr()`
-
-```python
-@staticmethod
-def calculate_snr(rssi_dbm, noise_floor_dbm):
-    """Tính SNR (Signal-to-Noise Ratio).
-    
-    Công thức: SNR = RSSI - N0
-    """
-```
-
-**Chức năng:** Tính tỷ lệ tín hiệu/nhiễu.
-
-**Giải thích:**
-- SNR > 0 dB → Tín hiệu mạnh hơn nhiễu → mạng khả dụng
-- SNR < 0 dB → Nhiễu lớn hơn tín hiệu → mạng không khả dụng
-- SNR càng cao → chất lượng càng tốt
-
-**Ví dụ:**
-```python
-snr = NetworkPhysics.calculate_snr(-79.5, -95)
-# SNR = -79.5 - (-95) = 15.5 dB → Mạng tốt
-```
-
-#### 📍 Hàm `calculate_throughput_shannon()`
-
-```python
-@staticmethod
-def calculate_throughput_shannon(snr_db, bandwidth_mhz, efficiency=0.5):
-    """Tính throughput theo Shannon-Hartley Theorem.
-    
-    Công thức: R = B * log2(1 + SNR_linear) * η
-    """
-```
-
-**Chức năng:** Tính tốc độ truyền dữ liệu tối đa lý thuyết.
-
-**Giải thích:**
-- `B`: Băng thông (Hz)
-- `SNR_linear`: SNR ở dạng tuyến tính (không phải dB)
-- `η`: Hệ số hiệu suất phổ (0.5 = 50% hiệu suất thực tế)
-
-**Ví dụ:**
-```python
-throughput = NetworkPhysics.calculate_throughput_shannon(
-    snr_db=15.5,
-    bandwidth_mhz=20,
-    efficiency=0.5
-)
-# Kết quả: ≈ 41.2 Mbps
-```
-
-#### 📍 Hàm `calculate_packet_loss_rate()`
-
-```python
-@staticmethod
-def calculate_packet_loss_rate(snr_db, snr_threshold_db, k=0.5):
-    """Tính Packet Loss Rate theo Sigmoid Model.
-    
-    Công thức: PLR = 1 / (1 + e^(k*(SNR - SNR_threshold)))
-    """
-```
-
-**Chức năng:** Tính tỷ lệ mất gói dữ liệu.
-
-**Giải thích:**
-- SNR cao → PLR thấp (ít mất gói)
-- SNR = SNR_threshold → PLR = 50%
-- SNR thấp → PLR cao (nhiều mất gói)
-
-**Ví dụ:**
-```python
-plr = NetworkPhysics.calculate_packet_loss_rate(
-    snr_db=15.5,
-    snr_threshold_db=10,
-    k=0.5
-)
-# SNR = 15.5 > 10 → PLR ≈ 0.07 (7% mất gói)
-```
-
-#### 📍 Hàm `calculate_qos()` - **HÀM CHÍNH**
-
-```python
-@staticmethod
-def calculate_qos(network_type, distance):
-    """Tính toán đầy đủ QoS metrics.
-    
-    Returns:
-        {
-            "bandwidth": float,      # Mbps
-            "latency": int,          # ms
-            "packet_loss": float,    # 0.0-1.0
-            "rssi": float,           # dBm
-            "snr": float,            # dB
-            "is_available": bool
-        }
-    """
-```
-
-**Chức năng:** Tích hợp TẤT CẢ các hàm trên để tính QoS hoàn chỉnh.
-
-**Luồng xử lý:**
-1. Tính RSSI từ khoảng cách
-2. Tính SNR từ RSSI
-3. Kiểm tra `is_available` (SNR > 0?)
-4. Tính throughput theo Shannon
-5. Tính packet loss rate
-6. Tính latency (base + overhead từ retransmission)
-
-**Ví dụ sử dụng:**
-```python
-qos = NetworkPhysics.calculate_qos("Wi-Fi", 50)
-# Output:
-# {
-#     "bandwidth": 41.2,
-#     "latency": 12,
-#     "packet_loss": 0.07,
-#     "rssi": -79.5,
-#     "snr": 15.5,
-#     "is_available": True
-# }
-```
+**Lưu ý:** Không còn logic trùng lặp trong `network_physics.py`; mọi công thức nằm ở `formulas.py`, tham số ở `constants.py`.
 
 ---
 
@@ -749,32 +600,29 @@ QOS_REQUIREMENTS = {
 
 ```python
 def calculate_energy_cost(network_config, network_state, task):
-    """Tính chi phí năng lượng."""
+    """Tính chi phí năng lượng (đơn giản hóa)."""
 ```
 
-**Chức năng:** Ước tính năng lượng tiêu thụ cho một mạng và task.
-
-**Công thức:**
+**Công thức (hiện tại):**
 ```
-Total_Energy = Base_Energy + Transmission_Energy + Wakeup_Energy
+E_total = (energy_tx × DataSize) + energy_wakeup
 ```
 
-**Chi tiết:**
-- `Base_Energy = energy_idle`: Năng lượng chờ (mW)
-- `Transmission_Energy = data_size * energy_tx`: Năng lượng truyền (mJ)
-- `Wakeup_Energy = energy_wakeup`: Năng lượng khởi động (mJ)
+**Giải thích:**
+- `energy_tx` (mJ/KB) đã bao gồm RF + circuit overhead → không cần nhân thời gian
+- Bỏ `energy_idle` khỏi công thức (không đáng kể với burst ngắn)
+- Giữ `energy_wakeup` để phản ánh chi phí bật radio
 
-**Ước tính data_size:**
-- `IDLE_MONITORING`: 1 KB (sensor data)
-- `DATA_BURST_ALERT`: 50 KB (alert payload)
-- `VIDEO_STREAMING`: 1000 KB (video chunk)
+**Ước tính DataSize (từ `TaskDataEstimates`):**
+- IDLE_MONITORING: 1 KB
+- DATA_BURST_ALERT: 50 KB
+- VIDEO_STREAMING: 1000 KB
 
 **Ví dụ:**
 ```python
 # Wi-Fi, VIDEO_STREAMING
 energy = calculate_energy_cost(wifi_config, wifi_state, TaskState.VIDEO_STREAMING)
-# = 10.0 (idle) + 1000*0.5 (tx) + 2.0 (wakeup)
-# = 512 mJ
+# = 0.5 mJ/KB * 1000 KB + 2.0 mJ = 502.0 mJ
 ```
 
 #### 📍 Hàm `calculate_qos_penalty()`
