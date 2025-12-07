@@ -59,8 +59,24 @@ class SimulationEngine:
         for network_type, stations in self.base_stations.items():
             print(f"  {network_type}: {len(stations)} stations")
     
-    def _calculate_distance(self, pos1: Tuple[int, int], pos2: Tuple[int, int]) -> float:
-        """Tính khoảng cách Euclidean giữa 2 điểm"""
+    def _calculate_distance(self, pos1: Tuple[int, int], pos2) -> float:
+        """Tính khoảng cách Euclidean giữa 2 điểm.
+
+        Hỗ trợ truyền pos2 là station_id (str) bằng cách tra cứu toạ độ
+        trong danh sách base stations. Nếu không tìm thấy, trả về inf.
+        """
+        # Nếu pos2 là station_id, tra cứu toạ độ
+        if isinstance(pos2, str):
+            for stations in self.base_stations.values():
+                for station in stations:
+                    if station["id"] == pos2:
+                        pos2 = station["pos"]
+                        break
+                if not isinstance(pos2, str):
+                    break
+            else:
+                return float("inf")
+
         return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
     
 
