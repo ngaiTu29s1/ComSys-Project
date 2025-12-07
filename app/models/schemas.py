@@ -11,8 +11,8 @@ class TaskState(str, Enum):
 
 class NetworkConfig(BaseModel):
     name: str = Field(..., description="Network name (e.g., 'Wi-Fi', '5G', 'BLE')")
-    energy_tx: float = Field(..., gt=0, description="Transmission energy (mJ/KB)")
-    energy_idle: float = Field(..., gt=0, description="Idle energy (mW)")
+    power_tx: float = Field(..., gt=0, description="Transmission power (mW == mJ/s)")
+    power_idle: float = Field(..., gt=0, description="Idle power (mW)")
     energy_wakeup: float = Field(..., ge=0, description="Wakeup energy (mJ)")
 
     model_config = {
@@ -20,8 +20,8 @@ class NetworkConfig(BaseModel):
             "examples": [
                 {
                     "name": "Wi-Fi",
-                    "energy_tx": 0.5,
-                    "energy_idle": 10.0,
+                    "power_tx": 100.0,
+                    "power_idle": 10.0,
                     "energy_wakeup": 2.0
                 }
             ]

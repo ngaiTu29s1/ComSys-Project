@@ -19,27 +19,27 @@ from app.models.schemas import TaskState
 # ========================================================================
 
 class NetworkEnergyConfig:
-    """Energy parameters cho mỗi loại mạng."""
+    """Power parameters cho mỗi loại mạng (mW)."""
     
     WIFI = {
         "name": "Wi-Fi",
-        "energy_tx": 0.5,      # mJ/KB - Năng lượng truyền mỗi KB (bao gồm RF + circuit)
-        "energy_idle": 10.0,   # mW - Công suất idle (không truyền/nhận)
-        "energy_wakeup": 2.0   # mJ - Năng lượng khởi động radio một lần
+        "power_tx": 100.0,     # mW
+        "power_idle": 10.0,    # mW
+        "energy_wakeup": 2.0   # mJ - khởi động radio
     }
     
     FIVEG = {
         "name": "5G",
-        "energy_tx": 1.2,      # mJ/KB - Cao hơn vì công suất phát lớn
-        "energy_idle": 15.0,   # mW - Cao vì baseband processing phức tạp
-        "energy_wakeup": 5.0   # mJ - Cao vì phải đồng bộ với base station
+        "power_tx": 300.0,     # mW
+        "power_idle": 15.0,    # mW
+        "energy_wakeup": 5.0   # mJ
     }
     
     BLE = {
         "name": "BLE",
-        "energy_tx": 0.1,      # mJ/KB - Rất thấp vì công suất phát nhỏ
-        "energy_idle": 2.0,    # mW - Thấp vì thiết kế tiết kiệm năng lượng
-        "energy_wakeup": 0.5   # mJ - Thấp vì giao thức đơn giản
+        "power_tx": 10.0,      # mW
+        "power_idle": 2.0,     # mW
+        "energy_wakeup": 0.5   # mJ
     }
 
 
@@ -84,7 +84,7 @@ QOS_REQUIREMENTS: Dict[TaskState, Dict[str, Any]] = {
         "must_be_available": True
     },
     TaskState.VIDEO_STREAMING: {
-        "min_bandwidth": 10.0,      # 10 Mbps - Cần bandwidth cao
+        "min_bandwidth": 36.0,      # 36 Mbps - Cần bandwidth cao (siết chặt để loại mạng yếu)
         "max_latency": 200,         # 200ms - Cho phép buffer
         "must_be_available": True
     }

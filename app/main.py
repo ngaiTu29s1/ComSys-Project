@@ -150,8 +150,8 @@ def get_system_status():
         },
         "network_configs": {
             name: {
-                "energy_tx": config.energy_tx,
-                "energy_idle": config.energy_idle,
+                "power_tx": config.power_tx,
+                "power_idle": config.power_idle,
                 "energy_wakeup": config.energy_wakeup
             }
             for name, config in simulation_engine.network_configs.items()
@@ -265,8 +265,8 @@ def make_decision(device_state: DeviceState) -> Dict:
                     "is_available": network.is_available
                 },
                 "config_info": {
-                    "energy_tx": network_config.energy_tx,
-                    "energy_idle": network_config.energy_idle,
+                    "power_tx": network_config.power_tx,
+                    "power_idle": network_config.power_idle,
                     "energy_wakeup": network_config.energy_wakeup
                 }
             }
@@ -597,8 +597,8 @@ def get_network_configs():
     """Expose cấu hình năng lượng cho từng mạng (phục vụ test_api.py)."""
     return {
         name: {
-            "energy_tx": config.energy_tx,
-            "energy_idle": config.energy_idle,
+            "power_tx": config.power_tx,
+            "power_idle": config.power_idle,
             "energy_wakeup": config.energy_wakeup,
         }
         for name, config in simulation_engine.network_configs.items()

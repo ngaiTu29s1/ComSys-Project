@@ -11,6 +11,9 @@ class SimulationEngine:
     
     Simulates an IoT device moving in an environment with multiple base stations,
     with QoS changing based on distance using physics-based wireless propagation models.
+    
+    NEW: Uses hotspot-based position generation (70% near WiFi, 30% random)
+    to create realistic multi-homed scenarios for benchmarking.
     """
     
     def __init__(self, map_size: Tuple[int, int] = (1000, 1000)):
@@ -179,36 +182,53 @@ class SimulationEngine:
         # Fallback
         return TaskState.IDLE_MONITORING
     
+    def _generate_hotspot_position(self) -> Tuple[int, int]:
+        """
+        Sinh vị trí mới dựa trên hotspot (tập trung quanh WiFi stations).
+        
+        Logic:
+        - 70% xác suất: Quanh WiFi station (5-40m) -> Multi-homed zone
+        - 30% xác suất: Random toàn map -> 5G-only zone
+        
+        Returns:
+            Vị trí mới (x, y)
+        """
+        if random.random() < 0.7:
+            # 70%: Quanh WiFi hotspot (vùng chồng lấn sóng)
+            wifi_stations = self.base_stations.get("Wi-Fi", [])
+            if wifi_stations:
+                # Chọn ngẫu nhiên 1 WiFi station
+                station = random.choice(wifi_stations)
+                center_x, center_y = station["pos"]
+                
+                # Random trong bán kính 5-40m
+                radius = random.uniform(5, 40)
+                angle = random.uniform(0, 2 * math.pi)
+                
+                offset_x = int(radius * math.cos(angle))
+                offset_y = int(radius * math.sin(angle))
+                
+                new_x = max(0, min(center_x + offset_x, self.map_size[0] - 1))
+                new_y = max(0, min(center_y + offset_y, self.map_size[1] - 1))
+                
+                return (new_x, new_y)
+        
+        # 30%: Random toàn map (vùng xa, chỉ 5G)
+        new_x = random.randint(0, self.map_size[0] - 1)
+        new_y = random.randint(0, self.map_size[1] - 1)
+        return (new_x, new_y)
+    
     def _move_device(self, step_size: int = 10) -> Tuple[int, int]:
         """
-        Di chuyển thiết bị đến vị trí mới.
+        Di chuyển thiết bị đến vị trí mới (dùng hotspot logic).
         
         Args:
-            step_size: Kích thước bước di chuyển
+            step_size: Không còn dùng, giữ lại để tương thích API
             
         Returns:
             Vị trí mới (x, y)
         """
-        current_x, current_y = self.device_state.position
-        
-        # Di chuyển theo pattern: zig-zag để cover toàn bộ map
-        if self.simulation_step < 100:
-            # Giai đoạn 1: di chuyển ngang
-            new_x = min(current_x + step_size, self.map_size[0] - 1)
-            new_y = current_y
-        elif self.simulation_step < 200: 
-            # Giai đoạn 2: di chuyển dọc
-            new_x = current_x
-            new_y = min(current_y + step_size, self.map_size[1] - 1)
-        else:
-            # Giai đoạn 3: di chuyển ngẫu nhiên
-            directions = [(-step_size, 0), (step_size, 0), (0, -step_size), (0, step_size)]
-            dx, dy = random.choice(directions)
-            
-            new_x = max(0, min(current_x + dx, self.map_size[0] - 1))
-            new_y = max(0, min(current_y + dy, self.map_size[1] - 1))
-        
-        return (new_x, new_y)
+        return self._generate_hotspot_position()
     
     def run_simulation_step(self) -> DeviceState:
         """Run one simulation step.

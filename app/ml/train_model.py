@@ -18,6 +18,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import argparse
 from .feature_engineering import FeatureEngineer
 from app.core.constants import MLConfig
 
@@ -281,3 +282,21 @@ class ModelTrainer:
             Loaded RandomForestClassifier
         """
         return joblib.load(filepath)
+
+
+def _parse_args():
+    parser = argparse.ArgumentParser(description="Train Random Forest for network selection")
+    parser.add_argument("--data", default=MLConfig.TRAINING_DATA_PATH, help="Path to training CSV")
+    parser.add_argument("--model", default=MLConfig.MODEL_PATH, help="Output model path (.pkl)")
+    parser.add_argument("--test-size", type=float, default=MLConfig.TEST_SIZE, help="Test split ratio")
+    parser.add_argument("--no-save-plots", action="store_true", help="Disable saving evaluation plots")
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = _parse_args()
+    trainer = ModelTrainer()
+    trainer.load_data(args.data, test_size=args.test_size)
+    trainer.train()
+    trainer.evaluate(save_plots=not args.no_save_plots, output_dir=os.path.dirname(args.model) or "models")
+    trainer.save_model(args.model)
