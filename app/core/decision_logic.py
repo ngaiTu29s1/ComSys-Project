@@ -18,44 +18,40 @@ from app.core.constants import (
 )
 
 
-def calculate_energy_cost(network_config: NetworkConfig, 
-                         network_state: NetworkState,
-                         task: TaskState) -> float:
+def calculate_energy_cost(
+    network_config: NetworkConfig,
+    network_state: NetworkState,
+    task: TaskState,
+) -> float:
     """
-    Tính toán chi phí năng lượng dự kiến cho một mạng và tác vụ.
-    
-    CÔNG THỨC ĐƠN GIẢN HÓA (Option A - Simplified):
-    E_total ≈ (power_tx * T_tx) + E_wakeup
+    Tính chi phí năng lượng dựa trên thời gian truyền dữ liệu.
 
-    - power_tx (mW == mJ/s)
-    - T_tx ~ (data_size_Mb / bandwidth_Mbps) (giây)
-    
-    Args:
-        network_config: Cấu hình tĩnh của mạng
-        network_state: Trạng thái động hiện tại (chứa bandwidth khả dụng)
-        task: Loại tác vụ đang thực hiện
-        
-    Returns:
-        Chi phí năng lượng (đơn vị: mJ)
+    Logic mới (time-based):
+    1) throughput_mbps = network_state.bandwidth (clamp tối thiểu 0.01)
+    2) time_tx_s = data_size(Mb) / throughput_mbps ; 1 KB = 0.008 Mb
+    3) power_total_mw = power_tx + power_idle
+    4) energy_tx_mj = power_total_mw * time_tx_s
+    5) total_cost = energy_tx_mj + energy_wakeup
     """
-    # Lấy ước tính kích thước dữ liệu từ constants
-    estimated_data_kb = get_task_data_size(task)
 
-    # Ước tính thời gian truyền (s): (KB -> Mb) / bandwidth(Mbps)
-    data_mb = estimated_data_kb * 8.0 / 1000.0
-    bandwidth_mbps = max(network_state.bandwidth, 1e-3)
-    tx_time_s = data_mb / bandwidth_mbps
+    # 1) Throughput (Mbps) với ngưỡng tối thiểu tránh chia cho 0
+    throughput_mbps = max(network_state.bandwidth, 0.01)
 
-    # Năng lượng truyền (mJ): power_tx (mW == mJ/s) * thời gian truyền (s)
-    transmission_energy = network_config.power_tx * tx_time_s
-    
-    # Chi phí khởi động radio
-    wakeup_energy = network_config.energy_wakeup  # mJ
-    
-    # Tổng chi phí năng lượng
-    total_energy_mj = transmission_energy + wakeup_energy
-    
-    return total_energy_mj
+    # 2) Thời gian truyền (s) với data_size tính từ task (KB -> Mb)
+    data_size_kb = get_task_data_size(task)
+    data_size_mb = data_size_kb * 0.008  # 1 KB = 0.008 Mb
+    time_tx_s = data_size_mb / throughput_mbps
+
+    # 3) Tổng công suất (mW == mJ/s)
+    power_total_mw = network_config.power_tx + network_config.power_idle
+
+    # 4) Năng lượng truyền (mJ)
+    energy_tx_mj = power_total_mw * time_tx_s
+
+    # 5) Tổng chi phí năng lượng (mJ)
+    total_cost = energy_tx_mj + network_config.energy_wakeup
+
+    return float(total_cost)
 
 
 def calculate_qos_penalty(network_state: NetworkState, task: TaskState) -> float:
