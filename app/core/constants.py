@@ -84,7 +84,7 @@ QOS_REQUIREMENTS: Dict[TaskState, Dict[str, Any]] = {
         "must_be_available": True
     },
     TaskState.VIDEO_STREAMING: {
-        "min_bandwidth": 10.0,      # 10 Mbps - Cần bandwidth cao
+        "min_bandwidth": 10.0,      # 10 Mbps - Cần bandwidth cao (siết chặt để loại mạng yếu)
         "max_latency": 200,         # 200ms - Cho phép buffer
         "must_be_available": True
     }
