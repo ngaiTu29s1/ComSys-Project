@@ -17,7 +17,7 @@ from app.ml.data_collector import DataCollector
 def main():
     """CLI for data collection"""
     parser = argparse.ArgumentParser(description="Collect training data from simulation")
-    parser.add_argument("--samples", type=int, default=1000, help="Number of samples to collect")
+    parser.add_argument("--samples", type=int, default=36000, help="Number of samples to collect")
     parser.add_argument("--output", type=str, default="data/raw/training_data.csv", help="Output file path")
     
     args = parser.parse_args()

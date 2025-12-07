@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 import joblib
+from app.core.constants import MLConfig
 
 
 class FeatureEngineer:

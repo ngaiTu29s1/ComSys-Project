@@ -18,6 +18,7 @@ import warnings
 import math
 
 from app.models.schemas import DeviceState, NetworkState, TaskState
+from app.core.constants import MLConfig
 from .feature_engineering import FeatureEngineer
 
 
@@ -241,17 +242,17 @@ class MLPredictor:
         # Initialize all network features với default values (not available)
         for net_type in ['Wi-Fi', '5G', 'BLE']:
             prefix = net_type.lower().replace('-', '')
-            features[f'{prefix}_rssi'] = -999.0
-            features[f'{prefix}_snr'] = -999.0
-            features[f'{prefix}_bandwidth'] = 0.0
-            features[f'{prefix}_latency'] = 9999
-            features[f'{prefix}_distance'] = 9999.0
+            features[f'{prefix}_rssi'] = MLConfig.UNAVAILABLE_RSSI
+            features[f'{prefix}_snr'] = MLConfig.UNAVAILABLE_SNR
+            features[f'{prefix}_bandwidth'] = MLConfig.UNAVAILABLE_BANDWIDTH
+            features[f'{prefix}_latency'] = MLConfig.UNAVAILABLE_LATENCY
+            features[f'{prefix}_distance'] = MLConfig.UNAVAILABLE_DISTANCE
         
         # Fill actual values cho available networks
         for network in device_state.available_networks:
             prefix = network.name.lower().replace('-', '')
-            features[f'{prefix}_rssi'] = network.rssi if network.rssi else -999.0
-            features[f'{prefix}_snr'] = network.snr if network.snr else -999.0
+            features[f'{prefix}_rssi'] = network.rssi if network.rssi else MLConfig.UNAVAILABLE_RSSI
+            features[f'{prefix}_snr'] = network.snr if network.snr else MLConfig.UNAVAILABLE_SNR
             features[f'{prefix}_bandwidth'] = network.bandwidth
             features[f'{prefix}_latency'] = network.latency
             

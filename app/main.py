@@ -11,10 +11,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import os
-from app.models.schemas import DeviceState, NetworkState
-from app.core.decision_logic import calculate_cost, select_best_network
+from app.models.schemas import DeviceState, NetworkState, TaskState
+from app.core.decision_logic import (
+    calculate_cost,
+    select_best_network,
+    calculate_energy_cost,
+    calculate_qos_penalty,
+)
 from app.services.simulation import SimulationEngine
 from app.ml.predictor import MLPredictor
 import logging
@@ -581,12 +586,76 @@ def get_current_simulation_state() -> Dict:
         )
 
 
-# Health check endpoint
 @app.get("/health")
 def health_check():
-    """Simple health check"""
+    """Health endpoint để test_api.py sử dụng."""
+    return {"status": "ok"}
+
+
+@app.get("/network-configs")
+def get_network_configs():
+    """Expose cấu hình năng lượng cho từng mạng (phục vụ test_api.py)."""
     return {
-        "status": "healthy",
-        "service": "IoT Network Selection API",
-        "version": "1.0.0"
+        name: {
+            "energy_tx": config.energy_tx,
+            "energy_idle": config.energy_idle,
+            "energy_wakeup": config.energy_wakeup,
+        }
+        for name, config in simulation_engine.network_configs.items()
     }
+
+
+@app.post("/decide")
+def decide(device_state: DeviceState):
+    """Alias cho /decision để tương thích test_api.py."""
+    if not device_state.available_networks:
+        raise HTTPException(status_code=400, detail="No available networks")
+
+    # Tính chi phí cho từng mạng
+    all_costs: Dict[str, float] = {}
+    for net in device_state.available_networks:
+        config = simulation_engine.network_configs.get(net.name)
+        if not config:
+            continue
+        all_costs[net.name] = calculate_cost(net, config, device_state.current_task)
+
+    # Chọn mạng tốt nhất
+    selected_net, selected_cost = select_best_network(
+        device_state.available_networks,
+        simulation_engine.network_configs,
+        device_state.current_task,
+    )
+
+    return {
+        "selected_network": selected_net.name,
+        "selected_cost": selected_cost,
+        "all_costs": all_costs,
+    }
+
+
+@app.post("/calculate-cost")
+def calculate_cost_endpoint(payload: Dict[str, Any]):
+    """Tính chi phí cho một network_state + task (compat với test_api.py)."""
+    try:
+        raw_state = payload.get("network_state")
+        raw_task = payload.get("task")
+        if not raw_state or not raw_task:
+            raise ValueError("Missing network_state or task")
+
+        network_state = NetworkState(**raw_state)
+        task = TaskState(raw_task)
+        config = simulation_engine.network_configs.get(payload.get("network_name", network_state.name))
+        if not config:
+            raise ValueError("Unknown network config")
+
+        energy_cost = calculate_energy_cost(config, network_state, task)
+        qos_penalty = calculate_qos_penalty(network_state, task)
+        total_cost = calculate_cost(network_state, config, task)
+
+        return {
+            "total_cost": total_cost,
+            "energy_cost": energy_cost,
+            "qos_penalty": qos_penalty,
+        }
+    except Exception as exc:  # giữ đơn giản cho test
+        raise HTTPException(status_code=400, detail=str(exc))

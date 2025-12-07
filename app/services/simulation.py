@@ -3,6 +3,7 @@ import math
 from typing import Dict, List, Tuple
 from app.models.schemas import TaskState, NetworkState, NetworkConfig, DeviceState
 from app.services.network_physics import NetworkPhysics
+from app.core.constants import NetworkEnergyConfig, SimulationConfig
 
 
 class SimulationEngine:
@@ -42,58 +43,40 @@ class SimulationEngine:
         self._update_available_networks()
     
     def _init_network_configs(self):
-        """Khởi tạo cấu hình các loại mạng với thông số giả định"""
+        """Khởi tạo cấu hình các loại mạng từ constants"""
         self.network_configs = {
-            "Wi-Fi": NetworkConfig(
-                name="Wi-Fi",
-                energy_tx=0.5,      # mJ/KB
-                energy_idle=10.0,   # mW
-                energy_wakeup=2.0   # mJ
-            ),
-            "5G": NetworkConfig(
-                name="5G", 
-                energy_tx=1.2,      # mJ/KB  
-                energy_idle=15.0,   # mW
-                energy_wakeup=5.0   # mJ
-            ),
-            "BLE": NetworkConfig(
-                name="BLE",
-                energy_tx=0.1,      # mJ/KB
-                energy_idle=2.0,    # mW
-                energy_wakeup=0.5   # mJ
-            )
+            "Wi-Fi": NetworkConfig(**NetworkEnergyConfig.WIFI),
+            "5G": NetworkConfig(**NetworkEnergyConfig.FIVEG),
+            "BLE": NetworkConfig(**NetworkEnergyConfig.BLE)
         }
     
     def _init_base_stations(self):
-        """Đặt các base stations tại các vị trí cố định trên bản đồ"""
-        # Store stations with IDs
-        self.base_stations = {
-            "Wi-Fi": [
-                {"id": "WiFi-1", "pos": (100, 100)},   # Wi-Fi router 1 - khu dân cư
-                {"id": "WiFi-2", "pos": (300, 250)},   # Wi-Fi router 2 - văn phòng  
-                {"id": "WiFi-3", "pos": (600, 400)},   # Wi-Fi router 3 - quán café
-                {"id": "WiFi-4", "pos": (800, 750)},   # Wi-Fi router 4 - trung tâm thương mại
-            ],
-            "5G": [
-                {"id": "5G-1", "pos": (200, 200)},   # 5G tower 1 - trung tâm thành phố
-                {"id": "5G-2", "pos": (500, 300)},   # 5G tower 2 - khu công nghiệp
-                {"id": "5G-3", "pos": (700, 600)},   # 5G tower 3 - sân bay
-                {"id": "5G-4", "pos": (900, 100)},   # 5G tower 4 - khu vực ngoại ô
-            ],
-            "BLE": [
-                {"id": "BLE-1", "pos": (150, 150)},   # BLE beacon 1 - cửa hàng
-                {"id": "BLE-2", "pos": (350, 350)},   # BLE beacon 2 - bảo tàng  
-                {"id": "BLE-3", "pos": (550, 550)},   # BLE beacon 3 - bệnh viện
-                {"id": "BLE-4", "pos": (750, 750)},   # BLE beacon 4 - nhà ga
-            ]
-        }
+        """Đặt các base stations từ SimulationConfig"""
+        # Load base station positions from constants
+        self.base_stations = SimulationConfig.BASE_STATION_POSITIONS
         
         print(f"📡 Đã khởi tạo base stations:")
         for network_type, stations in self.base_stations.items():
             print(f"  {network_type}: {len(stations)} stations")
     
-    def _calculate_distance(self, pos1: Tuple[int, int], pos2: Tuple[int, int]) -> float:
-        """Tính khoảng cách Euclidean giữa 2 điểm"""
+    def _calculate_distance(self, pos1: Tuple[int, int], pos2) -> float:
+        """Tính khoảng cách Euclidean giữa 2 điểm.
+
+        Hỗ trợ truyền pos2 là station_id (str) bằng cách tra cứu toạ độ
+        trong danh sách base stations. Nếu không tìm thấy, trả về inf.
+        """
+        # Nếu pos2 là station_id, tra cứu toạ độ
+        if isinstance(pos2, str):
+            for stations in self.base_stations.values():
+                for station in stations:
+                    if station["id"] == pos2:
+                        pos2 = station["pos"]
+                        break
+                if not isinstance(pos2, str):
+                    break
+            else:
+                return float("inf")
+
         return math.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
     
 

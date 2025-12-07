@@ -19,6 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from .feature_engineering import FeatureEngineer
+from app.core.constants import MLConfig
 
 
 class ModelTrainer:
@@ -26,19 +27,19 @@ class ModelTrainer:
     Train và evaluate Random Forest model.
     """
     
-    def __init__(self, n_estimators=100, max_depth=15, random_state=42):
+    def __init__(self, n_estimators=None, max_depth=None, random_state=None):
         """
-        Initialize model với hyperparameters.
+        Initialize model với hyperparameters từ MLConfig.
         
         Args:
-            n_estimators: Số lượng trees
-            max_depth: Độ sâu tối đa của tree
-            random_state: Random seed
+            n_estimators: Số lượng trees (default từ MLConfig)
+            max_depth: Độ sâu tối đa của tree (default từ MLConfig)
+            random_state: Random seed (default từ MLConfig)
         """
         self.model = RandomForestClassifier(
-            n_estimators=n_estimators,
-            max_depth=max_depth,
-            random_state=random_state,
+            n_estimators=n_estimators or MLConfig.N_ESTIMATORS,
+            max_depth=max_depth or MLConfig.MAX_DEPTH,
+            random_state=random_state or MLConfig.RANDOM_STATE,
             n_jobs=-1  # Use all CPU cores
         )
         self.feature_engineer = FeatureEngineer()
@@ -83,9 +84,9 @@ class ModelTrainer:
         # Feature engineering
         X, y = self.feature_engineer.fit_transform(df)
         
-        # Train/test split
+        # Train/test split sử dụng MLConfig
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42, stratify=y
+            X, y, test_size=test_size or MLConfig.TEST_SIZE, random_state=MLConfig.RANDOM_STATE, stratify=y
         )
         
         print(f"✅ Train set: {self.X_train.shape}")
