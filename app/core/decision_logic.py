@@ -10,42 +10,12 @@ lựa chọn mạng tối ưu dựa trên trạng thái tác vụ hiện tại.
 
 from typing import Dict, Any
 from app.models.schemas import TaskState, NetworkState, NetworkConfig
-
-
-# Trọng số cho từng loại tác vụ (w_energy + w_qos = 1.0)
-TASK_WEIGHTS: Dict[TaskState, Dict[str, float]] = {
-    TaskState.IDLE_MONITORING: {
-        "w_energy": 0.8,    # Ưu tiên tiết kiệm năng lượng
-        "w_qos": 0.2        # QoS không quá quan trọng
-    },
-    TaskState.DATA_BURST_ALERT: {
-        "w_energy": 0.3,    # Năng lượng ít quan trọng hơn
-        "w_qos": 0.7        # Ưu tiên độ trễ thấp và bandwidth cao
-    },
-    TaskState.VIDEO_STREAMING: {
-        "w_energy": 0.4,    # Cân bằng năng lượng
-        "w_qos": 0.6        # Ưu tiên QoS cho streaming
-    }
-}
-
-# Yêu cầu QoS tối thiểu cho từng tác vụ
-QOS_REQUIREMENTS: Dict[TaskState, Dict[str, Any]] = {
-    TaskState.IDLE_MONITORING: {
-        "min_bandwidth": 0.1,       # 0.1 Mbps
-        "max_latency": 1000,        # 1000ms - không quan trọng
-        "must_be_available": True
-    },
-    TaskState.DATA_BURST_ALERT: {
-        "min_bandwidth": 5.0,       # 5 Mbps
-        "max_latency": 100,         # 100ms - quan trọng
-        "must_be_available": True
-    },
-    TaskState.VIDEO_STREAMING: {
-        "min_bandwidth": 10.0,      # 10 Mbps
-        "max_latency": 200,         # 200ms
-        "must_be_available": True
-    }
-}
+from app.core.constants import (
+    TASK_WEIGHTS,
+    QOS_REQUIREMENTS,
+    QoSPenaltyCoefficients,
+    get_task_data_size
+)
 
 
 def calculate_energy_cost(network_config: NetworkConfig, 
@@ -54,35 +24,31 @@ def calculate_energy_cost(network_config: NetworkConfig,
     """
     Tính toán chi phí năng lượng dự kiến cho một mạng và tác vụ.
     
+    CÔNG THỨC ĐƠN GIẢN HÓA (Option A - Simplified):
+    E_total = (energy_tx × DataSize) + E_wakeup
+    
+    Giả định: energy_tx (mJ/KB) ĐÃ BAO GỒM cả RF power + circuit overhead.
+    Không cần nhân thêm với T_tx vì đã được normalize theo KB.
+    
     Args:
         network_config: Cấu hình tĩnh của mạng
-        network_state: Trạng thái động hiện tại
+        network_state: Trạng thái động hiện tại (chứa bandwidth khả dụng)
         task: Loại tác vụ đang thực hiện
         
     Returns:
-        Chi phí năng lượng (đơn vị: mJ hoặc mW tùy theo tác vụ)
+        Chi phí năng lượng (đơn vị: mJ)
     """
-    # Chi phí năng lượng cơ bản từ cấu hình
-    base_energy = network_config.energy_idle  # mW
+    # Lấy ước tính kích thước dữ liệu từ constants
+    estimated_data_kb = get_task_data_size(task)
     
-    # Ước tính dữ liệu cần truyền dựa trên tác vụ (KB)
-    data_size_estimates = {
-        TaskState.IDLE_MONITORING: 1.0,      # 1KB - sensor data
-        TaskState.DATA_BURST_ALERT: 50.0,    # 50KB - alert data  
-        TaskState.VIDEO_STREAMING: 1000.0    # 1MB - video chunk
-    }
-    
-    estimated_data_kb = data_size_estimates.get(task, 10.0)
-    
-    # Chi phí truyền dữ liệu
+    # Năng lượng truyền (bao gồm RF + circuit)
     transmission_energy = estimated_data_kb * network_config.energy_tx  # mJ
     
-    # Chi phí khởi động nếu mạng chưa active (giả định)
+    # Chi phí khởi động radio
     wakeup_energy = network_config.energy_wakeup  # mJ
     
-    # Tổng chi phí năng lượng (chuyển đổi về cùng đơn vị mJ)
-    # Giả định thời gian idle = 1 giây cho đơn giản
-    total_energy_mj = base_energy + transmission_energy + wakeup_energy
+    # Tổng chi phí năng lượng
+    total_energy_mj = transmission_energy + wakeup_energy
     
     return total_energy_mj
 
@@ -105,25 +71,23 @@ def calculate_qos_penalty(network_state: NetworkState, task: TaskState) -> float
     
     # Kiểm tra mạng có khả dụng không
     if requirements["must_be_available"] and not network_state.is_available:
-        return 1000.0  # Phạt nặng nếu mạng không khả dụng
+        return QoSPenaltyCoefficients.UNAVAILABLE_PENALTY
     
     penalty = 0.0
     
     # Kiểm tra băng thông
     if network_state.bandwidth < requirements["min_bandwidth"]:
-        # Phạt tỷ lệ với mức thiếu hụt
         bandwidth_deficit = requirements["min_bandwidth"] - network_state.bandwidth
-        penalty += bandwidth_deficit * 50  # Hệ số phạt cho băng thông
+        penalty += bandwidth_deficit * QoSPenaltyCoefficients.BANDWIDTH_DEFICIT_FACTOR
     
     # Kiểm tra độ trễ
     if network_state.latency > requirements["max_latency"]:
-        # Phạt tỷ lệ với độ trễ vượt ngưỡng
         latency_excess = network_state.latency - requirements["max_latency"]
-        penalty += latency_excess * 2  # Hệ số phạt cho độ trễ
+        penalty += latency_excess * QoSPenaltyCoefficients.LATENCY_EXCESS_FACTOR
     
     # Nếu vi phạm nghiêm trọng, trả về penalty cao
-    if penalty > 500:
-        return 1000.0
+    if penalty > QoSPenaltyCoefficients.SEVERE_VIOLATION_THRESHOLD:
+        return QoSPenaltyCoefficients.UNAVAILABLE_PENALTY
     
     return penalty
 

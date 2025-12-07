@@ -1,16 +1,13 @@
 """
 Physical wireless propagation models for IoT network simulation.
 
-This module implements scientifically accurate models based on:
-- Log-Distance Path Loss Model with Shadowing
-- Shannon-Hartley Theorem for throughput
-- Sigmoid model for Packet Loss Rate
-- Latency model with retransmission overhead
+Chỉ giữ phần "điều phối"; toàn bộ công thức được tách sang
+`app/core/formulas.py` và tham số nằm trong `app/core/constants.py`.
 """
 
-import math
-import random
 from typing import Dict
+from app.core.constants import NetworkPhysicsConfig
+from app.core import formulas
 
 
 class NetworkPhysics:
@@ -19,80 +16,13 @@ class NetworkPhysics:
     Based on Log-Distance Path Loss Model and Shannon-Hartley Theorem.
     """
     
-    # Physical parameters for each network type
+    # Physical parameters cho từng mạng (đã chuẩn hóa tại constants.py)
     CONFIGS = {
-        "Wi-Fi": {
-            "frequency_ghz": 2.4,
-            "tx_power_dbm": 20,          # 100mW
-            "ref_path_loss_db": 40,      # PL(d0) at 1m
-            "path_loss_exponent": 3.5,   # Indoor with walls
-            "bandwidth_mhz": 20,
-            "noise_floor_dbm": -95,
-            "shadowing_sigma": 2.0,      # Reduced from 4.0 for less noise
-            "max_throughput_mbps": 100,
-            "base_latency_ms": 5,
-            "snr_threshold_db": 10       # PLR = 50% at this SNR
-        },
-        "5G": {
-            "frequency_ghz": 3.5,
-            "tx_power_dbm": 43,          # 20W
-            "ref_path_loss_db": 44,
-            "path_loss_exponent": 3.0,   # Urban
-            "bandwidth_mhz": 100,
-            "noise_floor_dbm": -100,
-            "shadowing_sigma": 2.5,      # Reduced from 4.0
-            "max_throughput_mbps": 200,
-            "base_latency_ms": 10,
-            "snr_threshold_db": 5
-        },
-        "BLE": {
-            "frequency_ghz": 2.4,
-            "tx_power_dbm": 0,           # 1mW
-            "ref_path_loss_db": 40,
-            "path_loss_exponent": 2.5,   # Open space
-            "bandwidth_mhz": 2,
-            "noise_floor_dbm": -90,
-            "shadowing_sigma": 1.5,      # Reduced from 2.0
-            "max_throughput_mbps": 2,
-            "base_latency_ms": 20,
-            "snr_threshold_db": 8
-        }
+        "Wi-Fi": NetworkPhysicsConfig.WIFI,
+        "5G": NetworkPhysicsConfig.FIVEG,
+        "BLE": NetworkPhysicsConfig.BLE,
     }
-    
-    @staticmethod
-    def calculate_path_loss(
-        distance: float,
-        path_loss_exponent: float,
-        d0: float = 1.0,
-        pl0: float = 40.0,
-        sigma: float = 4.0
-    ) -> float:
-        """
-        Calculate Path Loss using Log-Distance Shadowing Model.
-        
-        PL(d) = PL(d0) + 10*n*log10(d/d0) + X_sigma
-        
-        Args:
-            distance: Distance in meters
-            path_loss_exponent: Path loss exponent (n)
-            d0: Reference distance (default 1m)
-            pl0: Path loss at d0 (dB)
-            sigma: Shadowing standard deviation (dB)
-            
-        Returns:
-            Path loss in dB
-        """
-        # Clamp distance to avoid log(0)
-        d = max(distance, 0.1)
-        
-        # Log-distance path loss
-        pl = pl0 + 10 * path_loss_exponent * math.log10(d / d0)
-        
-        # Add shadowing (Gaussian noise)
-        shadowing = random.gauss(0, sigma)
-        
-        return pl + shadowing
-    
+
     @staticmethod
     def calculate_rssi(network_type: str, distance: float) -> float:
         """
@@ -112,19 +42,14 @@ class NetworkPhysics:
         
         config = NetworkPhysics.CONFIGS[network_type]
         
-        # Calculate path loss
-        pl = NetworkPhysics.calculate_path_loss(
+        pl = formulas.calculate_path_loss(
             distance=distance,
             path_loss_exponent=config["path_loss_exponent"],
-            d0=1.0,
+            d0=config["reference_distance_m"],
             pl0=config["ref_path_loss_db"],
-            sigma=config["shadowing_sigma"]
+            sigma=config["shadowing_sigma_db"],
         )
-        
-        # RSSI = Tx Power - Path Loss
-        rssi = config["tx_power_dbm"] - pl
-        
-        return rssi
+        return formulas.calculate_rssi(config["tx_power_dbm"], pl)
     
     @staticmethod
     def calculate_snr(rssi_dbm: float, noise_floor_dbm: float) -> float:
@@ -140,7 +65,7 @@ class NetworkPhysics:
         Returns:
             SNR in dB
         """
-        return rssi_dbm - noise_floor_dbm
+        return formulas.calculate_snr(rssi_dbm, noise_floor_dbm)
     
     @staticmethod
     def calculate_throughput_shannon(
@@ -161,19 +86,12 @@ class NetworkPhysics:
         Returns:
             Throughput in Mbps
         """
-        # Convert SNR from dB to linear
-        snr_linear = 10 ** (snr_db / 10.0)
-        
-        # Bandwidth from MHz to Hz
-        bandwidth_hz = bandwidth_mhz * 1e6
-        
-        # Shannon capacity in bps
-        capacity_bps = bandwidth_hz * math.log2(1 + snr_linear) * efficiency
-        
-        # Convert to Mbps
-        capacity_mbps = capacity_bps / 1e6
-        
-        return max(0.0, capacity_mbps)
+        return formulas.calculate_throughput_shannon(
+            snr_db=snr_db,
+            bandwidth_mhz=bandwidth_mhz,
+            efficiency=efficiency,
+            max_throughput_mbps=float("inf"),  # clamp bên ngoài
+        )
     
     @staticmethod
     def calculate_packet_loss_rate(
@@ -194,14 +112,7 @@ class NetworkPhysics:
         Returns:
             Packet Loss Rate (0.0 - 1.0)
         """
-        exponent = k * (snr_db - snr_threshold_db)
-        
-        # Clamp to avoid overflow
-        exponent = max(-20, min(20, exponent))
-        
-        plr = 1.0 / (1.0 + math.exp(exponent))
-        
-        return plr
+        return formulas.calculate_packet_loss_rate(snr_db, snr_threshold_db, k)
     
     @staticmethod
     def calculate_qos(network_type: str, distance: float) -> Dict[str, float]:
@@ -240,7 +151,7 @@ class NetworkPhysics:
         snr = NetworkPhysics.calculate_snr(rssi, config["noise_floor_dbm"])
         
         # 3. Check availability (SNR > 0 dB is minimum threshold)
-        is_available = snr > 0
+        is_available = formulas.is_network_available(snr)
         
         if not is_available:
             return {
@@ -253,31 +164,28 @@ class NetworkPhysics:
             }
         
         # 4. Calculate throughput using Shannon (clamped to max throughput)
-        throughput = NetworkPhysics.calculate_throughput_shannon(
+        bandwidth = formulas.calculate_throughput_shannon(
             snr_db=snr,
             bandwidth_mhz=config["bandwidth_mhz"],
-            efficiency=0.5
+            efficiency=config["spectral_efficiency"],
+            max_throughput_mbps=config["max_throughput_mbps"],
         )
-        bandwidth = min(throughput, config["max_throughput_mbps"])
         
         # 5. Calculate Packet Loss Rate (steeper curve = more realistic)
-        plr = NetworkPhysics.calculate_packet_loss_rate(
+        plr = formulas.calculate_packet_loss_rate(
             snr_db=snr,
             snr_threshold_db=config["snr_threshold_db"],
-            k=1.0  # Increased from 0.5 for more realistic PLR behavior
+            k=config["plr_sigmoid_k"],
         )
-        
-        # Clamp minimum PLR for very high SNR (physical limit ~0.01%)
-        if snr > 30:
-            plr = min(plr, 0.001)  # Max 0.1% for excellent signal
-        elif snr > 20:
-            plr = min(plr, 0.01)   # Max 1% for good signal
+        plr = formulas.clamp_plr_for_high_snr(plr, snr)
         
         # 6. Calculate Latency (base latency + retransmission overhead)
         # Assumption: each 1% PLR adds 10ms latency due to retransmit
-        base_latency = config["base_latency_ms"]
-        retransmit_overhead = plr * 100 * 10  # PLR 10% -> +100ms
-        latency = base_latency + retransmit_overhead
+        latency = formulas.calculate_latency(
+            base_latency_ms=config["base_latency_ms"],
+            plr=plr,
+            overhead_per_percent_ms=10.0,
+        )
         
         return {
             "bandwidth": round(bandwidth, 2),
