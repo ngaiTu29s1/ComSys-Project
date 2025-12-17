@@ -150,6 +150,7 @@ def select_best_network(available_networks: list[NetworkState],
     
     best_network = None
     min_cost = float('inf')
+    min_energy = float('inf')
     
     for network in available_networks:
         # Lấy cấu hình tương ứng
@@ -160,10 +161,14 @@ def select_best_network(available_networks: list[NetworkState],
         
         # Tính chi phí
         cost = calculate_cost(network, config, task)
+        energy = calculate_energy_cost(config, network, task)
         
         # Cập nhật mạng tốt nhất
-        if cost < min_cost:
+        # Ưu tiên: cost thấp nhất; nếu gần bằng nhau (epsilon) thì chọn energy thấp hơn
+        epsilon = 1e-9
+        if cost < min_cost or (abs(cost - min_cost) < epsilon and energy < min_energy):
             min_cost = cost
+            min_energy = energy
             best_network = network
     
     if best_network is None:
