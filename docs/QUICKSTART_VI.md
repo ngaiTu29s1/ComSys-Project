@@ -137,26 +137,35 @@ Should show: `rf_network_selector.pkl`, `rf_network_selector_feature_engineer.pk
 ### Bước 5: Khởi động Server FastAPI
 
 ```bash
-python app/main.py
+uvicorn app.main:app --reload --port 8000
 ```
 
-**Ý nghĩa:**
-- Khởi động server FastAPI trên `http://localhost:8000`
-- **Port:** 8000 (mặc định FastAPI)
-- **Host:** 127.0.0.1 (localhost)
-- **Workers:** 1 (dev mode)
-- **Auto-reload:** Có (dev mode)
+**Ý nghĩa từng phần:**
+- `uvicorn`: ASGI server cho Python (đã cài trong environment.yml)
+- `app.main:app`: Import module `app.main` và lấy object `app` (FastAPI instance)
+  - `app.main` = file `app/main.py`
+  - `:app` = biến `app` trong file đó
+- `--reload`: Auto-reload khi code thay đổi (chỉ dùng dev mode)
+  - Khi save file, server tự restart
+  - **Không dùng trong production**
+- `--port 8000`: Chạy trên port 8000
+  - Có thể đổi: `--port 8001`, `--port 9000`, v.v.
 
 **Quá trình:**
-1. Import FastAPI app từ `app/main.py`
+1. Uvicorn import `app.main` module (từ working directory)
 2. Load mô hình ML: `models/rf_network_selector.pkl`
-3. Khởi động Uvicorn server
-4. Lắng nghe requests trên port 8000
+3. Khởi động ASGI server
+4. Lắng nghe requests trên `http://127.0.0.1:8000`
+5. Watch file changes (do `--reload`)
 
 **Output:**
 ```
-INFO:     Uvicorn running on http://127.0.0.1:8000
-INFO:     Application startup complete
+INFO:     Will watch for changes in these directories: ['C:\\Users\\...\\CommunicationSystem']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [12345] using StatReload
+INFO:     Started server process [67890]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
 ```
 
 **Endpoints có sẵn:**
@@ -340,7 +349,7 @@ python -m app.ml.train_model --data data/raw/training_data.csv --model models/rf
 # Output: models/rf_network_selector.pkl, confusion_matrix.png (~20 giây)
 
 # Terminal 1: Chạy API
-python app/main.py
+uvicorn app.main:app --reload --port 8000
 # Output: INFO: Uvicorn running on http://127.0.0.1:8000
 
 # Terminal 2: Mở terminal mới, kích hoạt môi trường
@@ -371,7 +380,7 @@ pytest tests/ -v
 ```bash
 # Terminal 1:
 conda activate comsys-project
-python app/main.py
+uvicorn app.main:app --reload --port 8000
 
 # Terminal 2:
 conda activate comsys-project
@@ -425,16 +434,44 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ### Lỗi: `ModuleNotFoundError: No module named 'app'`
 
-**Nguyên nhân:** Python không tìm thấy package `app/`
+**Nguyên nhân:** Uvicorn/Python không tìm thấy package `app/` hoặc đang chạy sai working directory
 
-**Giải pháp:**
+**Giải pháp 1: Đảm bảo chạy từ folder gốc**
 ```bash
-# Chạy từ folder gốc (CommunicationSystem)
-cd c:\Users\Tuan Tu Tran\Documents\code\CommunicationSystem
+# Chuyển đến folder gốc (CommunicationSystem)
+cd C:\Users\Tuan Tu Tran\Documents\code\CommunicationSystem
 
 # Verify folder structure
 ls app/
 # Should show: __init__.py, main.py, core/, ml/, models/, services/
+
+# Chạy lại uvicorn
+uvicorn app.main:app --reload --port 8000
+```
+
+**Giải pháp 2: Kiểm tra môi trường đã activate**
+```bash
+# Verify môi trường conda
+conda info --envs
+# Should show (*) ở dòng comsys-project
+
+# Nếu chưa activate
+conda activate comsys-project
+
+# Chạy lại
+uvicorn app.main:app --reload --port 8000
+```
+
+**Giải pháp 3: Verify uvicorn đã cài**
+```bash
+# Kiểm tra uvicorn
+which uvicorn  # Linux/Mac
+where uvicorn  # Windows
+
+# Nếu không có, cài lại môi trường
+conda env remove -n comsys-project
+conda env create -f environment.yml
+conda activate comsys-project
 ```
 
 ### Lỗi: `FileNotFoundError: data/raw/training_data.csv`
@@ -461,7 +498,7 @@ kill -9 <PID>  # (Mac/Linux)
 taskkill /PID <PID> /F  # (Windows)
 
 # Hoặc chọn port khác
-python app/main.py --port 8001
+uvicorn app.main:app --reload --port 8001
 ```
 
 ### Lỗi: Memory không đủ khi train model
