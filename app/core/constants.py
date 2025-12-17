@@ -52,7 +52,7 @@ class TaskDataEstimates:
     
     IDLE_MONITORING = 1.0       # 1KB - Sensor data nhỏ
     DATA_BURST_ALERT = 50.0     # 50KB - Alert message + metadata
-    VIDEO_STREAMING = 1000.0    # 1MB - Video chunk (1 second @ 8 Mbps)
+    VIDEO_STREAMING = 15000.0    # 1MB - Video chunk (1 second @ 8 Mbps)
 
 
 # Trọng số MCDM cho từng loại tác vụ (w_energy + w_qos = 1.0)
