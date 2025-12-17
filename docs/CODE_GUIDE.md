@@ -738,30 +738,53 @@ QOS_REQUIREMENTS = {
 
 ```python
 def calculate_energy_cost(network_config, network_state, task):
-    """Tính chi phí năng lượng (đơn giản hóa)."""
+    """Tính chi phí năng lượng dựa trên thời gian truyền."""
 ```
 
-**Công thức (hiện tại):**
+**Công thức (Time-based - NEW):**
 ```
-E_total = (energy_tx × DataSize) + energy_wakeup
+1. throughput_mbps = max(network_state.bandwidth, 0.01)  # Clamp tối thiểu
+2. data_size_mb = get_task_data_size(task) × 0.008       # Convert KB → MB
+3. time_tx_s = data_size_mb / throughput_mbps            # Seconds
+4. power_total_mw = power_tx + power_idle                # mW
+5. energy_tx_mj = power_total_mw × time_tx_s             # mJ
+6. total_energy = energy_tx_mj + energy_wakeup           # mJ
 ```
 
-**Giải thích:**
-- `energy_tx` (mJ/KB) đã bao gồm RF + circuit overhead → không cần nhân thời gian
-- Bỏ `energy_idle` khỏi công thức (không đáng kể với burst ngắn)
-- Giữ `energy_wakeup` để phản ánh chi phí bật radio
+**Giải thích chi tiết:**
+- Lấy `power_tx` và `power_idle` từ `NetworkConfig` (đơn vị: mW)
+- Tổng công suất `power_total = tx + idle` → cả hai tiêu thụ khi truyền
+- Thời gian truyền = dung lượng / tốc độ (định luật cơ bản)
+- Năng lượng = công suất × thời gian (định luật vật lý)
+- Thêm `energy_wakeup` để phản ánh chi phí bật radio
 
 **Ước tính DataSize (từ `TaskDataEstimates`):**
-- IDLE_MONITORING: 1 KB
-- DATA_BURST_ALERT: 50 KB
-- VIDEO_STREAMING: 1000 KB
-
-**Ví dụ:**
 ```python
-# Wi-Fi, VIDEO_STREAMING
-energy = calculate_energy_cost(wifi_config, wifi_state, TaskState.VIDEO_STREAMING)
-# = 0.5 mJ/KB * 1000 KB + 2.0 mJ = 502.0 mJ
+IDLE_MONITORING = 1.0 KB        # Sensor data nhỏ
+DATA_BURST_ALERT = 50.0 KB      # Alert + metadata
+VIDEO_STREAMING = 15000.0 KB    # 15 MB (1 sec @ 8 Mbps)
 ```
+
+**Ví dụ tính toán (Wi-Fi, VIDEO_STREAMING):**
+```
+1. throughput = 85.3 Mbps (từ QoS model)
+2. data_size = 15000 KB × 0.008 = 120 MB
+3. time_tx = 120 MB / 85.3 Mbps = 1.407 s
+4. power_total = 100 mW + 10 mW = 110 mW
+5. energy_tx = 110 mW × 1.407 s = 154.8 mJ
+6. total = 154.8 + 2.0 = 156.8 mJ ✅
+```
+
+**So sánh với 5G:**
+```
+1. throughput = 120.5 Mbps
+2. time_tx = 120 / 120.5 = 0.996 s
+3. power_total = 300 + 15 = 315 mW
+4. energy_tx = 315 × 0.996 = 313.7 mJ
+5. total = 313.7 + 5.0 = 318.7 mJ (gấp 2× Wi-Fi!)
+```
+
+**Kết luận:** Wi-Fi tốn ít hơn nhưng chậm hơn → MCDM chọn dựa trên task weights
 
 #### 📍 Hàm `calculate_qos_penalty()`
 
