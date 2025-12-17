@@ -6,33 +6,144 @@
 > 
 > **Tech Stack:** Python 3.11 | FastAPI | Random Forest (99.9% accuracy) | Physics-based QoS
 > 
-> **Cập nhật:** December 7, 2025 (Energy Formula Refactor + Constants Centralization)
+> **Cập nhật:** December 17, 2025 (Power-based Energy + Hotspot Positioning + Energy Tie-breaker)
 > 
 > **Liên quan:** [`congthuc.md`](congthuc.md) cho chi tiết toán học
 
 ---
 
-## 🚀 MAJOR UPDATES (December 7, 2025)
+## 🚀 MAJOR UPDATES (December 17, 2025)
 
-### ⚡ Energy Formula Simplification
+### ⚡ Energy Formula Refinement: Power-Based Time Calculation
 
-**Before (Complex):**
+**Before (Per-KB model):**
 ```
-E_total = (energy_tx × T_tx) + (energy_idle × T_idle) + E_wakeup
-```
-
-**After (Simplified):**
-```
-E_total = (energy_tx × DataSize) + E_wakeup
+E_total = (energy_tx × DataSize_KB) + E_wakeup
 ```
 
-**Rationale:**
-- `energy_tx` (mJ/KB) already includes RF power + circuit overhead
-- No need to multiply by transmission time (normalized per KB)
-- Idle energy removed (negligible for short bursts)
-- Easier to interpret and scale to new network types
+**After (Power × Time model):**
+```
+E_total = (power_tx + power_idle) × (DataSize_MB / Bandwidth_Mbps) + E_wakeup
+         = Power_mW × TX_Time_s + E_wakeup (mJ)
+```
 
-**Impact:** Cleaner code, more predictable ML features, easier parameter tuning
+**Key Changes:**
+- Renamed: `energy_tx` (mJ/KB) → `power_tx` (mW)
+- Renamed: `energy_idle` (mJ/KB) → `power_idle` (mW)
+- Formula: Explicit **time-based calculation** reflects real physics
+- Unit clarity: `mW == mJ/s` (power is energy per second)
+
+**Network Parameters (in constants.py):**
+
+| Network | power_tx (mW) | power_idle (mW) | energy_wakeup (mJ) |
+|---------|--------------|-----------------|-------------------|
+| Wi-Fi   | 100.0        | 10.0            | 2.0               |
+| 5G      | 300.0        | 15.0            | 5.0               |
+| BLE     | 10.0         | 2.0             | 0.5               |
+
+**Example Calculation (VIDEO_STREAMING: 15 MB @ Wi-Fi):**
+```
+1. throughput = 85.3 Mbps (from QoS)
+2. time_tx = 15 MB / 85.3 Mbps = 0.176 s
+3. power_total = 100 + 10 = 110 mW
+4. energy_tx = 110 mW × 0.176 s = 19.4 mJ
+5. total_energy = 19.4 + 2.0 = 21.4 mJ ✅
+```
+
+**Impact:** Accurate energy modeling, reflects physical device power profiles
+
+---
+
+### 📍 Realistic Multi-Homed Device Positioning
+
+**New hotspot-based generation in `simulation.py`:**
+```python
+def _generate_hotspot_position(self):
+    """70% near Wi-Fi, 30% random anywhere"""
+```
+
+**Logic:**
+- **70% of steps:** Device stays near Wi-Fi station (5-40m radius)
+  - Creates **multi-homed zones** where both Wi-Fi + 5G available
+  - Enables dilemma scenarios: low-power Wi-Fi vs high-power 5G
+  
+- **30% of steps:** Device moves randomly across map
+  - 5G-only zones where Wi-Fi unavailable
+  - Tests algorithm's ability to handle network constraints
+
+**Impact:** Charts now show **meaningful energy delta** (AI < Max-RSSI)
+- **Max-RSSI:** Always chooses 5G in hotspots (higher power waste)
+- **Proposed (MCDM/AI):** Chooses Wi-Fi in hotspots (energy saved)
+- **Random:** Scattered between the two
+
+---
+
+### ⚖️ Decision Logic: Energy Tie-Breaker for MCDM
+
+**Updated `select_best_network()` in decision_logic.py:**
+
+```python
+epsilon = 1e-9
+if cost < min_cost or (abs(cost - min_cost) < epsilon and energy < min_energy):
+    min_cost = cost
+    min_energy = energy
+    best_network = network
+```
+
+**Logic:**
+1. **Primary:** Choose network with minimum total cost
+2. **Tie-breaker:** When costs nearly equal (within ε), prefer lower energy
+3. **Floating-point safety:** `abs(cost - min_cost) < epsilon` instead of `==`
+
+**When does tie-breaking occur?**
+- Multiple networks meet QoS requirement equally well
+- Both have similar total cost (within floating-point tolerance)
+- → Prefer the one consuming less energy (more sustainable)
+
+**Impact:** More consistent decisions + stable policy charts
+
+---
+
+### 🎯 QoS Requirements Tightening
+
+**Updated minimums in constants.py (QOS_REQUIREMENTS):**
+
+| Task | min_bandwidth | max_latency | reasoning |
+|------|---------------|------------|-----------|
+| IDLE_MONITORING | 0.1 Mbps | 1000 ms | Sensor data is small |
+| DATA_BURST_ALERT | 5.0 Mbps | 100 ms | Alert needs low latency |
+| VIDEO_STREAMING | **36.0 Mbps** ⬆️ | 200 ms | Eliminates weak networks |
+
+**Note:** VIDEO_STREAMING raised from generic to **36 Mbps**
+- Prevents fallback to poor networks
+- Forces WiFi/5G selection (BLE max ≤ 2 Mbps)
+- Realistic video quality threshold
+
+---
+
+### ✅ ML & Training Pipeline Updates
+
+**Training model with CLI:**
+```bash
+python -m app.ml.train_model --data data/raw/training_data.csv \
+                             --model models/rf_network_selector.pkl
+```
+
+**Auto-save features:**
+- Generates `confusion_matrix.png` → Model validation
+- Generates `feature_importance.png` → Insight into decision factors
+
+**Policy comparison charts:**
+```bash
+python scripts/generate_policy_charts.py
+```
+
+**Outputs:**
+- `policy_energy.png` → Energy comparison
+- `policy_qos_penalty.png` → QoS compliance
+- `policy_total_cost.png` → Overall efficiency
+
+**Expected result:** AI algorithm ≈ or better than Max-RSSI in energy
 
 ---
 
@@ -208,26 +319,44 @@ class TaskState(str, Enum):
 ```python
 class NetworkConfig(BaseModel):
     name: str
-    energy_tx: float       # Năng lượng truyền (mJ/KB)
-    energy_idle: float     # Năng lượng chờ (mW)
-    energy_wakeup: float   # Năng lượng khởi động (mJ)
+    power_tx: float       # Công suất truyền (mW)
+    power_idle: float     # Công suất chờ (mW == mJ/s)
+    energy_wakeup: float  # Năng lượng khởi động (mJ)
 ```
 
 **Chức năng:** Lưu trữ thông số năng lượng **cố định** của một loại mạng.
 
-**Ví dụ thực tế:**
+**Ví dụ thực tế (từ constants.py):**
 ```python
-wifi_config = NetworkConfig(
-    name="Wi-Fi",
-    energy_tx=0.5,      # Truyền 1KB tốn 0.5 mJ
-    energy_idle=10.0,   # Chờ tốn 10 mW/giây
-    energy_wakeup=2.0   # Bật mạng tốn 2 mJ
-)
+# Wi-Fi
+{
+    "name": "Wi-Fi",
+    "power_tx": 100.0,      # mW - Công suất truyền
+    "power_idle": 10.0,     # mW - Công suất chờ
+    "energy_wakeup": 2.0    # mJ - Khởi động radio
+}
+
+# 5G
+{
+    "name": "5G",
+    "power_tx": 300.0,      # mW - Cao hơn Wi-Fi
+    "power_idle": 15.0,     # mW
+    "energy_wakeup": 5.0    # mJ
+}
+
+# BLE
+{
+    "name": "BLE",
+    "power_tx": 10.0,       # mW - Tiết kiệm nhất
+    "power_idle": 2.0,      # mW
+    "energy_wakeup": 0.5    # mJ
+}
 ```
 
 **Dùng để làm gì?**
 - Tính toán chi phí năng lượng trong thuật toán MCDM
 - So sánh hiệu suất năng lượng giữa các mạng
+- Cơ sở cho định luật `Energy = (power_tx + power_idle) × time_tx + energy_wakeup`
 
 #### 🔹 Class `NetworkState` (BaseModel)
 ```python
@@ -571,30 +700,39 @@ TASK_WEIGHTS = {
 **Chức năng:** Định nghĩa trọng số ưu tiên cho từng task.
 
 **Giải thích:**
-- `IDLE_MONITORING`: Thiết bị idle → ưu tiên tiết kiệm pin
-- `DATA_BURST_ALERT`: Cảnh báo khẩn cấp → ưu tiên gửi nhanh
-- `VIDEO_STREAMING`: Streaming → cần cân bằng
+- `IDLE_MONITORING`: Thiết bị idle → ưu tiên tiết kiệm pin (80% energy, 20% QoS)
+- `DATA_BURST_ALERT`: Cảnh báo khẩn cấp → ưu tiên gửi nhanh (30% energy, 70% QoS)
+- `VIDEO_STREAMING`: Streaming → cần cân bằng (40% energy, 60% QoS)
 
 #### 📍 `QOS_REQUIREMENTS` Dictionary
 
 ```python
 QOS_REQUIREMENTS = {
     TaskState.IDLE_MONITORING: {
-        "min_bandwidth": 0.1,    # Chỉ cần 0.1 Mbps
-        "max_latency": 1000      # Có thể chậm 1 giây
+        "min_bandwidth": 0.1,       # Chỉ cần 0.1 Mbps
+        "max_latency": 1000,        # Có thể chậm 1 giây
+        "must_be_available": True
     },
     TaskState.DATA_BURST_ALERT: {
-        "min_bandwidth": 5.0,    # Cần 5 Mbps
-        "max_latency": 100       # Phải < 100ms
+        "min_bandwidth": 5.0,       # Cần 5 Mbps
+        "max_latency": 100,         # Phải < 100ms
+        "must_be_available": True
     },
     TaskState.VIDEO_STREAMING: {
-        "min_bandwidth": 10.0,   # Cần 10 Mbps
-        "max_latency": 200
+        "min_bandwidth": 36.0,      # ⬆️ Cao: loại trừ mạng yếu (BLE max 2Mbps)
+        "max_latency": 200,         # 200ms (cho phép buffer)
+        "must_be_available": True
     }
 }
 ```
 
 **Chức năng:** Yêu cầu QoS tối thiểu cho từng task.
+
+**Giải thích:**
+- **VIDEO_STREAMING ngưỡng cao (36 Mbps):** 
+  - BLE không thể đáp ứng (max 2 Mbps) → automatically excluded
+  - Wi-Fi/5G thường đủ → algorithm chọn dựa trên energy + QoS trade-off
+  - Tạo điều kiện cho "dilemma scenarios": Wi-Fi (low power) vs 5G (high power)
 
 #### 📍 Hàm `calculate_energy_cost()`
 
