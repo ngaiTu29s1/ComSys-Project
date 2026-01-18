@@ -1,3 +1,20 @@
+# Ignore Conda temporary folders accidentally created inside the repo
+Tran/
+Tu/
+Tran/AppData/Local/Temp/
+**/conda-*/
+
+# Python/venv caches
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# VS Code
+.vscode/
+
+# Node/Frontend
+node_modules/
+dist/
 # === Python cache & compiled ===
 __pycache__/
 *.py[cod]
@@ -25,13 +42,15 @@ conda-meta/
 *.ipynb_checkpoints
 jupyter_notebook_config.py
 
-# === Data & Models (generated) ===
-data/
-models/
-*.csv
+# === Data & Models (keep for reproducibility) ===
+# Keep training data and trained models in repo
+# Ignore only generated/processed outputs
+data/processed/*.csv
 *.parquet
-*.joblib
-*.pkl
+
+# Keep directory structure
+!data/.gitkeep
+!models/.gitkeep
 *.h5
 
 # === Logs / Outputs ===
@@ -60,3 +79,5 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+
+.github

@@ -1,0 +1,92 @@
+from enum import Enum
+from typing import List, Tuple
+from pydantic import BaseModel, Field
+
+
+class TaskState(str, Enum):
+    IDLE_MONITORING = "IDLE_MONITORING"
+    DATA_BURST_ALERT = "DATA_BURST_ALERT"      
+    VIDEO_STREAMING = "VIDEO_STREAMING"        
+
+
+class NetworkConfig(BaseModel):
+    name: str = Field(..., description="Network name (e.g., 'Wi-Fi', '5G', 'BLE')")
+    power_tx: float = Field(..., gt=0, description="Transmission power (mW == mJ/s)")
+    power_idle: float = Field(..., gt=0, description="Idle power (mW)")
+    energy_wakeup: float = Field(..., ge=0, description="Wakeup energy (mJ)")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Wi-Fi",
+                    "power_tx": 100.0,
+                    "power_idle": 10.0,
+                    "energy_wakeup": 2.0
+                }
+            ]
+        }
+    }
+
+
+class NetworkState(BaseModel):
+    name: str = Field(..., description="Network name")
+    bandwidth: float = Field(..., gt=0, description="Available bandwidth (Mbps)")
+    latency: int = Field(..., gt=0, description="Latency (ms)")
+    is_available: bool = Field(..., description="Network availability status")
+    station_id: str | None = Field(None, description="ID of the base station providing service")
+    rssi: float | None = Field(None, description="Received Signal Strength Indicator (dBm)")
+    snr: float | None = Field(None, description="Signal-to-Noise Ratio (dB)")
+    packet_loss_rate: float | None = Field(None, description="Packet Loss Rate (0-1)")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "5G",
+                    "bandwidth": 100.0,
+                    "latency": 20,
+                    "is_available": True
+                }
+            ]
+        }
+    }
+
+
+class DeviceState(BaseModel):
+    """
+    Current state of the IoT device in the simulation system.
+    Includes position, current task, and list of available networks.
+    """
+    position: Tuple[int, int] = Field(..., description="Device coordinates (x, y)")
+    current_task: TaskState = Field(..., description="Current task state")
+    available_networks: List[NetworkState] = Field(
+        ..., 
+        min_length=0, 
+        description="List of available networks at current position"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "position": [100, 200],
+                    "current_task": "IDLE_MONITORING",
+                    "available_networks": [
+                        {
+                            "name": "Wi-Fi",
+                            "bandwidth": 50.0,
+                            "latency": 10,
+                            "is_available": True
+                        },
+                        {
+                            "name": "5G",
+                            "bandwidth": 100.0,
+                            "latency": 20,
+                            "is_available": True
+                        }
+                    ]
+                }
+            ]
+        }
+    }
