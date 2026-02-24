@@ -72,51 +72,30 @@ class MapVisualization {
         this.updateNetworksForPosition(); // Calculate available networks for initial position
         this.updateUI(); // Update UI to show initial state
         this.draw();
-        this.startAutoRunTimer();
+        // Sync once with backend
+        this.runSimulationStep();
     }
 
     setupEventListeners() {
-        // Simulation controls
-        document.getElementById('stepBtn').addEventListener('click', () => {
-            console.log('Step button clicked');
-            this.runSimulationStep();
-        });
-        document.getElementById('decisionBtn').addEventListener('click', () => {
-            console.log('Decision button clicked');
-            this.makeDecision();
-        });
-        document.getElementById('resetBtn').addEventListener('click', () => {
-            console.log('Reset button clicked');
-            this.resetSimulation();
-        });
+        // Only decision button remains
+        const decisionBtn = document.getElementById('decisionBtn');
+        if (decisionBtn) {
+            decisionBtn.addEventListener('click', () => {
+                console.log('Decision button clicked');
+                this.makeDecision();
+            });
+        }
 
-        // Auto-run toggle
-        const autoToggle = document.getElementById('autoToggle');
-        autoToggle.addEventListener('click', () => {
-            console.log('Auto-run toggle clicked');
-            this.toggleAutoRun();
-        });
-
-        // AI/ML toggle
-        const useAIToggle = document.getElementById('useAIToggle');
-        useAIToggle.addEventListener('click', () => {
-            useAIToggle.classList.toggle('active');
-            const isAI = useAIToggle.classList.contains('active');
-            console.log('AI mode:', isAI ? 'ENABLED' : 'DISABLED');
-
-            // Toggle body class for theme change
-            if (isAI) {
-                document.body.classList.remove('mcdm-mode');
-                document.body.classList.add('ai-mode');
-                document.getElementById('modeIndicator').textContent = 'AI MODE';
-                this.updateStatusBar('🤖 AI/ML Mode enabled');
-            } else {
-                document.body.classList.remove('ai-mode');
-                document.body.classList.add('mcdm-mode');
-                document.getElementById('modeIndicator').textContent = 'MCDM MODE';
-                this.updateStatusBar('📐 MCDM Mode enabled');
-            }
-        });
+        // Task selector
+        const taskSelector = document.getElementById('taskSelector');
+        if (taskSelector) {
+            taskSelector.addEventListener('change', (event) => {
+                this.currentTask = event.target.value;
+                console.log(`Task changed to: ${this.currentTask}`);
+                this.updateUI();
+                this.updateStatusBar(`Task changed to: ${this.currentTask}`);
+            });
+        }
 
         // Canvas click for manual device placement
         this.canvas.addEventListener('click', (e) => {
@@ -130,14 +109,6 @@ class MapVisualization {
             this.handleResize();
         });
 
-        // Task selector
-        const taskSelector = document.getElementById('taskSelector');
-        taskSelector.addEventListener('change', (event) => {
-            this.currentTask = event.target.value;
-            console.log(`Task changed to: ${this.currentTask}`);
-            this.updateUI();
-            this.updateStatusBar(`Task changed to: ${this.currentTask}`);
-        });
     }
 
     async checkApiStatus() {
@@ -163,28 +134,12 @@ class MapVisualization {
     }
 
     initializeUIState() {
-        // Initialize UI state to match toggle default (active = AI mode)
-        const useAIToggle = document.getElementById('useAIToggle');
-        const isAI = useAIToggle.classList.contains('active');
-
+        // AI mode fixed ON
         console.log('🎨 Initializing UI State...');
-        console.log('   Toggle element found:', !!useAIToggle);
-        console.log('   Toggle has "active" class:', isAI);
-        console.log('   Current body classes:', document.body.className);
-
-        // Set body class and mode indicator
-        if (isAI) {
-            document.body.classList.remove('mcdm-mode');
-            document.body.classList.add('ai-mode');
-            document.getElementById('modeIndicator').textContent = 'AI MODE';
-        } else {
-            document.body.classList.remove('ai-mode');
-            document.body.classList.add('mcdm-mode');
-            document.getElementById('modeIndicator').textContent = 'MCDM MODE';
-        }
-
-        console.log('   Final body classes:', document.body.className);
-        console.log('   Mode:', isAI ? 'AI MODE' : 'MCDM MODE');
+        document.body.classList.remove('mcdm-mode');
+        document.body.classList.add('ai-mode');
+        document.getElementById('modeIndicator').textContent = 'AI MODE';
+        console.log('   Mode: AI MODE');
     } initializeBaseStations() {
         // Initialize base stations - MUST MATCH app/services/simulation.py exactly!
         this.baseStations = [];
@@ -277,14 +232,13 @@ class MapVisualization {
         }
 
         try {
-            // Check AI/ML toggle state
-            const useAIToggle = document.getElementById('useAIToggle');
-            const useAI = useAIToggle.classList.contains('active');
-            const endpoint = useAI ? '/decision/ml' : '/decision';
+            // AI mode always ON
+            const useAI = true;
+            const endpoint = '/decision/ml';
 
-            console.log('Making decision with endpoint:', endpoint, 'Toggle active:', useAI);
+            console.log('Making decision with endpoint:', endpoint, 'AI fixed ON');
             console.log('Available networks:', this.availableNetworks);
-            this.updateStatusBar(useAI ? '🤖 Making AI/ML decision...' : '📐 Making MCDM decision...');
+            this.updateStatusBar('🤖 Making AI/ML decision...');
 
             const payload = {
                 position: [this.devicePosition.x, this.devicePosition.y],
@@ -314,35 +268,20 @@ class MapVisualization {
             console.log('Confidence:', data.confidence);
             console.log('Station ID:', data.station_id);
 
-            // Handle different response formats (ML vs MCDM)
-            if (useAI) {
-                // ML response format
-                this.decisionResult = {
-                    selectedNetwork: data.station_id || data.selected_network, // Use station_id for specific identification
-                    networkType: data.selected_network, // Keep network type separately
-                    stationId: data.station_id,
-                    method: data.method,
-                    confidence: data.confidence,
-                    cost: data.cost || null,
-                    allCosts: data.all_network_costs || null,
-                    algorithm: 'Machine Learning'
-                };
-                this.connectedStation = data.station_id;
-                const confPercent = data.confidence !== null ? (data.confidence * 100).toFixed(1) : '0.0';
-                this.updateStatusBar(`✅ [AI] Selected: ${data.station_id || data.selected_network} (Conf: ${confPercent}%)`);
-            } else {
-                // MCDM response format
-                this.decisionResult = {
-                    selectedNetwork: data.optimal_network,
-                    stationId: null,
-                    method: 'MCDM',
-                    confidence: null,
-                    cost: data.optimal_cost,
-                    allCosts: data.all_network_costs,
-                    algorithm: data.decision_summary?.algorithm || 'MCDM'
-                };
-                this.updateStatusBar(`✅ [MCDM] Selected: ${data.optimal_network} (Cost: ${data.optimal_cost.toFixed(2)})`);
-            }
+            // ML response format only
+            this.decisionResult = {
+                selectedNetwork: data.station_id || data.selected_network, // Use station_id for specific identification
+                networkType: data.selected_network, // Keep network type separately
+                stationId: data.station_id,
+                method: data.method,
+                confidence: data.confidence,
+                cost: data.cost || null,
+                allCosts: data.all_network_costs || null,
+                algorithm: 'Machine Learning'
+            };
+            this.connectedStation = data.station_id;
+            const confPercent = data.confidence !== null ? (data.confidence * 100).toFixed(1) : '0.0';
+            this.updateStatusBar(`✅ [AI] Selected: ${data.station_id || data.selected_network} (Conf: ${confPercent}%)`);
 
             this.updateDecisionDisplay();
             this.draw();
@@ -522,18 +461,22 @@ class MapVisualization {
 
     updateUI() {
         // Update device information
-        document.getElementById('devicePosition').textContent = `(${this.devicePosition.x}, ${this.devicePosition.y})`;
-        document.getElementById('simulationStep').textContent = this.simulationStep;
+        const posEl = document.getElementById('devicePosition');
+        const stepEl = document.getElementById('simulationStep');
+        const taskEl = document.getElementById('currentTask');
+        if (posEl) posEl.textContent = `(${this.devicePosition.x}, ${this.devicePosition.y})`;
+        if (stepEl) stepEl.textContent = this.simulationStep;
+        if (taskEl) taskEl.textContent = this.currentTask;
 
-        // Update current task badge
-        const taskElement = document.getElementById('currentTask');
-        taskElement.textContent = this.currentTask;
-        taskElement.className = 'task-badge ' + this.getTaskBadgeClass(this.currentTask);
+        // Summary of available networks
+        const availEl = document.getElementById('availableNetworks');
+        if (availEl) {
+            availEl.textContent = this.availableNetworks.length > 0
+                ? `${this.availableNetworks.length} available`
+                : '-';
+        }
 
-        // Update available networks
         this.updateNetworksList();
-
-        // Update decision result
         this.updateDecisionDisplay();
     }
 
@@ -548,6 +491,7 @@ class MapVisualization {
 
     updateNetworksList() {
         const networkList = document.getElementById('networkList');
+        if (!networkList) return;
 
         if (this.availableNetworks.length === 0) {
             networkList.innerHTML = `
@@ -558,10 +502,25 @@ class MapVisualization {
             return;
         }
 
+        const selectedId = this.decisionResult?.selectedNetwork;
+        const selectedType = this.decisionResult?.networkType || null;
+        const allCosts = this.decisionResult?.allCosts || {};
+
         networkList.innerHTML = this.availableNetworks.map(network => {
             const badgeClass = `network-${network.name.toLowerCase().replace('-', '')}`;
             const stationLabel = network.station_id || network.name;
             const distanceText = network.distance ? ` • ${network.distance.toFixed(0)}m` : '';
+
+            let benchLine = '';
+            if (selectedId && network.station_id === selectedId) {
+                const conf = this.decisionResult?.confidence !== null && this.decisionResult?.confidence !== undefined
+                    ? `${(this.decisionResult.confidence * 100).toFixed(1)}%`
+                    : '';
+                benchLine = `<div class="network-stats" style="font-weight:700;color:#2e7d32;">Selected ${conf ? '• ' + conf : ''}</div>`;
+            } else if (allCosts && network.station_id && allCosts[network.station_id] !== undefined) {
+                const cost = allCosts[network.station_id];
+                benchLine = `<div class="network-stats" style="color:#888;">Score: ${cost.toFixed(2)}</div>`;
+            }
 
             return `
                 <div class="network-item">
@@ -572,6 +531,7 @@ class MapVisualization {
                         <div class="network-stats">
                             ${network.bandwidth.toFixed(1)} Mbps • ${network.latency}ms${distanceText}
                         </div>
+                        ${benchLine}
                     </div>
                 </div>
             `;
@@ -579,74 +539,12 @@ class MapVisualization {
     }
 
     updateDecisionDisplay() {
-        const decisionElement = document.getElementById('decisionResult');
-
-        if (!this.decisionResult) {
-            decisionElement.classList.remove('visible');
-            return;
-        }
-
-        decisionElement.classList.add('visible');
-
-        // Update selected network name
-        document.getElementById('selectedNetwork').textContent = this.decisionResult.selectedNetwork;
-
-        // Update decision method label
-        const decisionMethod = document.getElementById('decisionMethod');
-        const confidenceMetric = document.getElementById('confidenceMetric');
-        const costMetric = document.getElementById('costMetric');
-        const decisionMetricHeader = document.getElementById('decisionMetricHeader');
-
-        const isAIMode = this.decisionResult.method === 'ML' || this.decisionResult.method === 'MCDM_Fallback';
-        const isFallback = this.decisionResult.method === 'MCDM_Fallback';
-
-        if (isAIMode) {
-            // AI/ML mode: show confidence for selected network
-            decisionMethod.textContent = isFallback ? 'AI (FALLBACK)' : 'AI SELECTED';
-            confidenceMetric.style.display = 'block';
-            costMetric.style.display = 'none';
-            decisionMetricHeader.innerHTML = 'Conf/Cost<br><small>(% / score)</small>';
-
-            const confidence = this.decisionResult.confidence !== null
-                ? this.decisionResult.confidence * 100
-                : 0;
-            document.getElementById('confidenceValue').textContent = `${confidence.toFixed(1)}%`;
-            document.getElementById('confidenceBar').style.width = `${confidence}%`;
-
-            // Update confidence metric label dynamically
-            const confidenceLabel = document.querySelector('#confidenceMetric .metric-label span:first-child');
-            if (confidenceLabel) {
-                confidenceLabel.textContent = 'AI Confidence';
-            }
-
-            if (isFallback) {
-                console.warn('⚠️ ML prediction used MCDM fallback');
-            }
-        } else {
-            // MCDM mode: show cost
-            decisionMethod.textContent = 'MATH CALCULATED';
-            confidenceMetric.style.display = 'none';
-            costMetric.style.display = 'block';
-            decisionMetricHeader.innerHTML = 'Cost<br><small>(score)</small>';
-
-            const cost = this.decisionResult.cost !== null ? this.decisionResult.cost : 0;
-            document.getElementById('costValue').textContent = cost.toFixed(2);
-            const costPercent = Math.min(100, (cost / 50) * 100);
-            document.getElementById('costBar').style.width = `${costPercent}%`;
-
-            // Update cost metric label
-            const costLabel = document.querySelector('#costMetric .metric-label span:first-child');
-            if (costLabel) {
-                costLabel.textContent = 'Optimization Cost';
-            }
-        }
-
-        // Populate comprehensive network table
-        this.populateNetworkTable(isAIMode);
+        // No decision panel in minimized UI; drawing uses decisionResult directly
     }
 
     populateNetworkTable(isAIMode) {
         const tableBody = document.getElementById('networksTableBody');
+        if (!tableBody) return;
 
         if (!this.availableNetworks || this.availableNetworks.length === 0) {
             tableBody.innerHTML = '<tr><td colspan="7" class="no-data">No networks available</td></tr>';
@@ -1001,38 +899,45 @@ class MapVisualization {
     drawNetworkConnections() {
         if (!this.decisionResult) return;
 
-        const networkType = this.decisionResult.selectedNetwork;
-        const stationsOfType = this.baseStations.filter(s => s.type === networkType);
+        const selectedStationId = this.decisionResult.stationId || this.decisionResult.selectedNetwork;
+        const networkType = this.decisionResult.networkType || this.decisionResult.selectedNetwork;
 
-        if (stationsOfType.length === 0) return;
+        let targetStation = null;
+        if (selectedStationId) {
+            targetStation = this.baseStations.find(s => s.id === selectedStationId) || null;
+        }
+        if (!targetStation && networkType) {
+            // fallback to nearest of type
+            const stationsOfType = this.baseStations.filter(s => s.type === networkType);
+            let minDistance = Infinity;
+            stationsOfType.forEach(station => {
+                const dx = this.devicePosition.x - station.x;
+                const dy = this.devicePosition.y - station.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    targetStation = station;
+                }
+            });
+        }
 
-        // Find closest station of the selected type
-        let closestStation = null;
-        let minDistance = Infinity;
+        if (!targetStation) return;
 
-        stationsOfType.forEach(station => {
-            const dx = this.devicePosition.x - station.x;
-            const dy = this.devicePosition.y - station.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+        // Track for glow highlight
+        this.connectedStation = targetStation.id;
 
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestStation = station;
-            }
-        });
-
-        if (!closestStation) return;
-
-        // Store for reference
-        this.connectedStation = closestStation;
+        const connectionColor = this.networkColors[networkType] || '#7c6ff5';
+        const dxStation = this.devicePosition.x - targetStation.x;
+        const dyStation = this.devicePosition.y - targetStation.y;
+        const distanceToStation = Math.sqrt(dxStation * dxStation + dyStation * dyStation);
 
         const deviceX = this.devicePosition.x * this.scale.x;
         const deviceY = this.devicePosition.y * this.scale.y;
-        const stationX = closestStation.x * this.scale.x;
-        const stationY = closestStation.y * this.scale.y;
+        const stationX = targetStation.x * this.scale.x;
+        const stationY = targetStation.y * this.scale.y;
 
         // Draw connection line
-        this.ctx.strokeStyle = this.networkColors[networkType];
+        this.ctx.strokeStyle = connectionColor;
         this.ctx.lineWidth = 3;
         this.ctx.setLineDash([8, 4]);
         this.ctx.beginPath();
@@ -1042,7 +947,7 @@ class MapVisualization {
         this.ctx.setLineDash([]);
 
         // Highlight connected station
-        this.ctx.strokeStyle = this.networkColors[networkType];
+        this.ctx.strokeStyle = connectionColor;
         this.ctx.lineWidth = 4;
         this.ctx.setLineDash([2, 2]);
         this.ctx.beginPath();
@@ -1051,7 +956,7 @@ class MapVisualization {
         this.ctx.setLineDash([]);
 
         // Find network state for detailed metrics
-        const networkState = this.availableNetworks.find(n => n.name === networkType);
+        const networkState = this.availableNetworks.find(n => n.station_id === selectedStationId || n.name === networkType);
 
         // Draw detailed info box
         const midX = (deviceX + stationX) / 2;
@@ -1063,25 +968,25 @@ class MapVisualization {
         const boxY = midY - boxHeight / 2;
 
         // Box background
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-        this.ctx.strokeStyle = this.networkColors[networkType];
+        this.ctx.fillStyle = 'rgba(17, 13, 30, 0.92)';
+        this.ctx.strokeStyle = connectionColor;
         this.ctx.lineWidth = 2;
         this.ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
         this.ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
 
         // Header with station ID
-        this.ctx.fillStyle = this.networkColors[networkType];
+        this.ctx.fillStyle = connectionColor;
         this.ctx.fillRect(boxX, boxY, boxWidth, 20);
 
-        this.ctx.fillStyle = 'white';
+        this.ctx.fillStyle = '#ffffff';
         this.ctx.font = 'bold 11px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(`📡 ${closestStation.id}`, midX, boxY + 10);
+        this.ctx.fillText(`📡 ${targetStation.id}`, midX, boxY + 10);
 
         if (networkState) {
             // Metrics
-            this.ctx.fillStyle = '#333';
+            this.ctx.fillStyle = '#f5f5f5';
             this.ctx.font = '9px Consolas, monospace';
             this.ctx.textAlign = 'left';
 
@@ -1110,23 +1015,23 @@ class MapVisualization {
             }
 
             // Distance and cost footer
-            this.ctx.fillStyle = '#666';
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
             this.ctx.font = 'bold 9px Arial';
             this.ctx.textAlign = 'center';
 
             // Show cost only for MCDM mode, confidence for AI mode
             if (this.decisionResult.cost !== null) {
-                this.ctx.fillText(`${minDistance.toFixed(0)}m • Cost: ${this.decisionResult.cost.toFixed(2)}`, midX, boxY + boxHeight - 8);
+                this.ctx.fillText(`${distanceToStation.toFixed(0)}m • Cost: ${this.decisionResult.cost.toFixed(2)}`, midX, boxY + boxHeight - 8);
             } else if (this.decisionResult.confidence !== null) {
-                this.ctx.fillText(`${minDistance.toFixed(0)}m • AI Confidence: ${(this.decisionResult.confidence * 100).toFixed(1)}%`, midX, boxY + boxHeight - 8);
+                this.ctx.fillText(`${distanceToStation.toFixed(0)}m • AI Confidence: ${(this.decisionResult.confidence * 100).toFixed(1)}%`, midX, boxY + boxHeight - 8);
             } else {
-                this.ctx.fillText(`${minDistance.toFixed(0)}m`, midX, boxY + boxHeight - 8);
+                this.ctx.fillText(`${distanceToStation.toFixed(0)}m`, midX, boxY + boxHeight - 8);
             }
         } else {
-            this.ctx.fillStyle = '#666';
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
             this.ctx.font = '10px Arial';
             this.ctx.textAlign = 'center';
-            this.ctx.fillText(`Distance: ${minDistance.toFixed(0)}m`, midX, boxY + 32);
+            this.ctx.fillText(`Distance: ${distanceToStation.toFixed(0)}m`, midX, boxY + 32);
         }
     }
 }

@@ -39,135 +39,91 @@
             max-width: 1600px;
             margin: 0 auto;
             display: grid;
-            grid-template-columns: 1fr 420px;
+            grid-template-columns: 1fr 300px;
             gap: 24px;
             height: calc(100vh - 40px);
         }
 
         .map-container {
-            background: #16213e;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            display: flex;
-            flex-direction: column;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 18px;
+            box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35);
         }
 
         .map-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 16px;
-            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            justify-content: space-between;
+            margin-bottom: 12px;
         }
 
         .map-title {
             color: #fff;
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.3px;
         }
 
         .mode-indicator {
-            display: inline-block;
-            padding: 6px 14px;
-            border-radius: 8px;
-            font-size: 11px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 12px;
             font-weight: 700;
-            text-transform: uppercase;
             letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-        }
-
-        body.ai-mode .mode-indicator {
-            background: linear-gradient(135deg, #9C27B0, #E91E63);
-            color: white;
-            box-shadow: 0 0 20px rgba(156, 39, 176, 0.5);
-        }
-
-        body.mcdm-mode .mode-indicator {
-            background: linear-gradient(135deg, #2196F3, #1976D2);
-            color: white;
-            box-shadow: 0 0 20px rgba(33, 150, 243, 0.5);
-        }
-
-        .map-canvas {
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            background: #0d1929;
-            display: block;
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
-            height: auto;
-            box-shadow: 0 0 40px rgba(100, 200, 255, 0.15);
-            transition: box-shadow 0.3s ease;
-        }
-
-        body.ai-mode .map-canvas {
-            box-shadow: 0 0 40px rgba(200, 100, 255, 0.25);
+            background: rgba(156, 39, 176, 0.2);
+            border: 1px solid rgba(156, 39, 176, 0.4);
+            color: #fff;
         }
 
         .canvas-wrapper {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 0;
+            background: #0c0c18;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .map-canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.05), transparent 35%),
+                radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.04), transparent 40%),
+                #080812;
         }
 
         .control-panel {
-            background: #16213e;
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .control-panel::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .control-panel::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 4px;
-        }
-
-        .control-panel::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
+            gap: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35);
         }
 
         .control-section {
             background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 12px;
-            padding: 18px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 12px;
         }
 
         .control-section h3 {
             color: #fff;
-            margin-bottom: 14px;
             font-size: 15px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            letter-spacing: -0.2px;
         }
 
         .device-info {
-            background: linear-gradient(135deg, #4CAF50, #388E3C);
-            color: white;
-            padding: 18px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
-            border: none;
+            padding: 12px;
         }
 
         .device-info h3 {
@@ -222,53 +178,68 @@
         }
 
         .network-list {
-            max-height: 200px;
+            max-height: 240px;
             overflow-y: auto;
+            padding-right: 6px;
         }
 
         .network-item {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 8px;
+            background: linear-gradient(145deg, rgba(34, 25, 58, 0.9), rgba(24, 18, 42, 0.9));
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 10px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
         }
 
         .network-name {
-            font-weight: 600;
-            color: #333;
+            font-weight: 700;
+            color: #f5f2ff;
+            letter-spacing: -0.2px;
         }
 
         .network-stats {
             font-size: 12px;
-            color: #666;
+            color: rgba(255, 255, 255, 0.75);
         }
 
         .network-badge {
-            padding: 2px 6px;
-            border-radius: 10px;
+            padding: 4px 8px;
+            border-radius: 999px;
             font-size: 10px;
-            font-weight: 600;
+            font-weight: 700;
             color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        .network-badge::before {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.8);
         }
 
         .network-wifi {
-            background: #2196F3;
+            background: linear-gradient(120deg, #42a5f5, #1e88e5);
         }
 
         .network-5g {
-            background: #9C27B0;
+            background: linear-gradient(120deg, #ba68c8, #8e24aa);
         }
 
         .network-ble {
-            background: #FF9800;
+            background: linear-gradient(120deg, #ffb74d, #fb8c00);
         }
 
         .network-4g {
-            background: #4CAF50;
+            background: linear-gradient(120deg, #66bb6a, #43a047);
         }
 
         .controls {
@@ -830,31 +801,11 @@
                 </div>
             </div>
 
-            <!-- Controls -->
+            <!-- Controls: only Make Decision -->
             <div class="control-section">
                 <h3>🎮 Controls</h3>
-
-                <!-- AI/ML Toggle -->
-                <div class="ai-toggle-section">
-                    <div class="animation-toggle">
-                        <span style="font-weight: 600;">🤖 Use AI/ML Mode</span>
-                        <div class="toggle-switch active" id="useAIToggle">
-                            <div class="toggle-knob"></div>
-                        </div>
-                    </div>
-                    <small>Switch between MCDM (Mathematical) and Random Forest (AI)</small>
-                </div>
-
-                <div class="animation-toggle">
-                    <span>Auto-run:</span>
-                    <div class="toggle-switch" id="autoToggle">
-                        <div class="toggle-knob"></div>
-                    </div>
-                </div>
                 <div class="controls">
-                    <button class="btn btn-primary" id="stepBtn">▶️ Simulation Step</button>
                     <button class="btn btn-success" id="decisionBtn">🧠 Make Decision</button>
-                    <button class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
                 </div>
             </div>
 
@@ -868,56 +819,10 @@
                 </select>
             </div>
 
-            <!-- Network Metrics Dashboard -->
-            <div class="control-section metrics-dashboard" id="decisionResult">
-                <h3>📊 Network Metrics & Decision</h3>
-
-                <div class="selected-network-display">
-                    <div class="network-label" id="decisionMethod">AI SELECTED</div>
-                    <div class="network-name" id="selectedNetwork">-</div>
-                </div>
-
-                <div class="metric-item" id="confidenceMetric" style="display: none;">
-                    <div class="metric-label">
-                        <span>AI Confidence</span>
-                        <span class="metric-value" id="confidenceValue">0%</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="confidenceBar" style="width: 0%;"></div>
-                    </div>
-                </div>
-
-                <div class="metric-item" id="costMetric" style="display: none;">
-                    <div class="metric-label">
-                        <span>Optimization Cost</span>
-                        <span class="metric-value" id="costValue">0.00</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="costBar" style="width: 0%;"></div>
-                    </div>
-                </div>
-
-                <!-- Comprehensive Network Comparison Table -->
-                <div style="margin-top: 16px; overflow-x: auto;">
-                    <table class="networks-table" id="networksTable">
-                        <thead>
-                            <tr>
-                                <th>Network</th>
-                                <th>BW<br><small>(Mbps)</small></th>
-                                <th>Lat<br><small>(ms)</small></th>
-                                <th>RSSI<br><small>(dBm)</small></th>
-                                <th>SNR<br><small>(dB)</small></th>
-                                <th>PLR<br><small>(%)</small></th>
-                                <th id="decisionMetricHeader">Cost</th>
-                            </tr>
-                        </thead>
-                        <tbody id="networksTableBody">
-                            <tr>
-                                <td colspan="7" class="no-data">Run a decision to see metrics</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <!-- Available Networks List -->
+            <div class="control-section">
+                <h3>🌐 Available Networks</h3>
+                <div class="network-list" id="networkList"></div>
             </div>
         </div>
     </div>
